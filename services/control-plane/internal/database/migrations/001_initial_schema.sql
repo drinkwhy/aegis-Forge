@@ -129,7 +129,7 @@ CREATE TABLE remediations (
 
 -- Audit Log (append-only)
 CREATE TABLE audit_log (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL,
     actor_id UUID,
     actor_type TEXT NOT NULL, -- user, agent, system
@@ -138,7 +138,8 @@ CREATE TABLE audit_log (
     resource_id UUID,
     metadata JSONB,
     ip_address INET,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    occurred_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (id, occurred_at)
 ) PARTITION BY RANGE (occurred_at);
 
 CREATE TABLE audit_log_2026 PARTITION OF audit_log

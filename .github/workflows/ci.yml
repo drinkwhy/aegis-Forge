@@ -119,8 +119,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: https://api.aegisforge.io
-          AUTH0_BASE_URL: https://app.aegisforge.io
+          NEXT_PUBLIC_API_URL: https://api.aegiscruc.io
+          AUTH0_BASE_URL: https://app.aegiscruc.io
 
   # ============================================================
   # Terraform Validation

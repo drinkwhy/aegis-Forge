@@ -94,7 +94,7 @@ type SyntheticDBRecord struct {
 // EgressPolicy controls what the sandbox can reach on the network.
 type EgressPolicy struct {
 	// AllowedDomains is the allowlist of domains the sandbox may connect to.
-	// Always includes the canary sinkhole domain (c.aegisforge.io).
+	// Always includes the canary sinkhole domain (c.aegiscruc.io).
 	AllowedDomains []string `json:"allowed_domains"`
 	// BlockAll overrides AllowedDomains and drops all outbound traffic.
 	BlockAll bool `json:"block_all"`

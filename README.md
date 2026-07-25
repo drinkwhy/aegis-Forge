@@ -2,7 +2,7 @@
 
 > **Continuous AI Security Validation Platform**
 
-Aegis Forge automatically tests and validates the security of autonomous AI agents connected to internal tools, databases, and APIs via the Model Context Protocol (MCP).
+Aegis Forge automatically tests and validates the security of autonomous AI agents connected to internal tools, databases, and APIs via the Model Context Protocol (MCP) using the aegiscruc.io platform.
 
 ---
 

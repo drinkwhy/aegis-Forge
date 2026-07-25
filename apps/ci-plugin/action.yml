@@ -28,7 +28,7 @@ inputs:
   control-plane-url:
     description: Override the Aegis Forge control plane URL (for self-hosted deployments)
     required: false
-    default: 'https://api.aegisforge.io'
+    default: 'https://api.aegiscruc.io'
 
 outputs:
   campaign-id:

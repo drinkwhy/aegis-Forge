@@ -35,7 +35,7 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(middleware.Logger) // In a real app, use a zerolog middleware here
 	s.router.Use(middleware.Recoverer)
 	s.router.Use(middleware.Timeout(60 * time.Second))
-	// CORS omitted for brevity, should allow aegisforge.io
+	// CORS omitted for brevity, should allow aegiscruc.io
 }
 
 func (s *Server) setupRoutes() {

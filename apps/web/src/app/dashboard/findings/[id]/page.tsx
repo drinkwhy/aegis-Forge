@@ -36,8 +36,8 @@ export default function FindingDetailPage() {
             <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>Recommended Fix</h3>
             <div style={{ background: '#090d16', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontFamily: 'var(--font-mono)', fontSize: '13px', overflowX: 'auto' }}>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                <div style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: '4px', marginBottom: '4px' }}>- const query = \`SELECT * FROM users WHERE query='\${input}'\`;</div>
-                <div style={{ color: 'var(--success)', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '4px' }}>+ const query = \`SELECT * FROM users WHERE role='public' AND query=$1\`;\n+ await db.query(query, [input]);</div>
+                <div style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', padding: '2px 8px', borderRadius: '4px', marginBottom: '4px' }}>{"- const query = `SELECT * FROM users WHERE query='${input}'`;"}</div>
+                <div style={{ color: 'var(--success)', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: '4px' }}>{'+ const query = `SELECT * FROM users WHERE role=\'public\' AND query=$1`;'}<br/>{'+ await db.query(query, [input]);'}</div>
               </pre>
             </div>
           </div>

@@ -1,0 +1,10 @@
+go 1.23
+
+use (
+    ./services/control-plane
+    ./services/sandbox-manager
+    ./libs/canary-sdk
+    ./libs/aegisagent
+    ./libs/roe-validator
+    ./libs/graph-client
+)

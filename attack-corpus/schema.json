@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AegisForge Attack Corpus Entry",
+  "type": "object",
+  "required": ["id", "attack_class", "owasp_mapping", "mitre_atlas", "severity", "preconditions", "payload_template", "canary_type", "success_detector", "sandbox_requirements"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z]+-[a-z]+-[0-9]{3}$"},
+    "attack_class": {"type": "string"},
+    "owasp_mapping": {"type": "string", "pattern": "^LLM[0-9]{2}$"},
+    "mitre_atlas": {"type": "string"},
+    "severity": {"type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]},
+    "preconditions": {"type": "object"},
+    "payload_template": {"type": "string"},
+    "canary_type": {"type": "string", "enum": ["ENV_CREDENTIAL", "FILE_CONTENT", "DB_RECORD", "MEMORY_FACT", "WEBHOOK", "NONE"]},
+    "success_detector": {"type": "string"},
+    "sandbox_requirements": {"type": "object"},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "references": {"type": "array", "items": {"type": "string"}}
+  }
+}

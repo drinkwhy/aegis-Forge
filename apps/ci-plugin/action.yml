@@ -1,0 +1,187 @@
+name: Aegis Forge Security Gate
+description: Runs Aegis Forge adversarial validation against your AI agent on every push. Fails the build if a critical vulnerability is detected.
+author: Aegis Forge (aegisforge.io)
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  api-key:
+    description: Your Aegis Forge API key (from Settings → API Keys)
+    required: true
+  agent-id:
+    description: The Aegis Forge agent ID to test (from the Asset Graph)
+    required: true
+  fail-on-severity:
+    description: Minimum severity that causes the CI build to fail (CRITICAL, HIGH, MEDIUM, LOW)
+    required: false
+    default: CRITICAL
+  timeout-minutes:
+    description: Maximum time in minutes to wait for campaign completion
+    required: false
+    default: '10'
+  retest-finding-id:
+    description: If set, re-tests a specific finding ID instead of running a full campaign
+    required: false
+    default: ''
+  control-plane-url:
+    description: Override the Aegis Forge control plane URL (for self-hosted deployments)
+    required: false
+    default: 'https://api.aegisforge.io'
+
+outputs:
+  campaign-id:
+    description: The ID of the campaign that was run
+  findings-count:
+    description: Total number of new findings discovered
+  critical-findings:
+    description: Number of CRITICAL severity findings
+  high-findings:
+    description: Number of HIGH severity findings
+  report-url:
+    description: URL to the full campaign report in the Aegis Forge dashboard
+
+runs:
+  using: composite
+  steps:
+    - name: Trigger Aegis Forge Campaign
+      id: trigger
+      shell: bash
+      env:
+        AEGIS_API_KEY: ${{ inputs.api-key }}
+        AEGIS_AGENT_ID: ${{ inputs.agent-id }}
+        AEGIS_CONTROL_PLANE: ${{ inputs.control-plane-url }}
+        AEGIS_RETEST_ID: ${{ inputs.retest-finding-id }}
+      run: |
+        echo "🛡️ Aegis Forge — Continuous AI Security Validation"
+        echo "Agent ID: $AEGIS_AGENT_ID"
+        echo "Severity threshold: ${{ inputs.fail-on-severity }}"
+        
+        # Trigger the campaign (or retest a specific finding)
+        if [ -n "$AEGIS_RETEST_ID" ]; then
+          echo "Re-testing finding: $AEGIS_RETEST_ID"
+          PAYLOAD="{\"finding_id\": \"$AEGIS_RETEST_ID\", \"triggered_by\": \"github_actions\", \"commit_sha\": \"$GITHUB_SHA\"}"
+          ENDPOINT="$AEGIS_CONTROL_PLANE/api/v1/findings/$AEGIS_RETEST_ID/retest"
+        else
+          PAYLOAD="{\"agent_id\": \"$AEGIS_AGENT_ID\", \"triggered_by\": \"github_actions\", \"commit_sha\": \"$GITHUB_SHA\", \"branch\": \"$GITHUB_REF_NAME\"}"
+          ENDPOINT="$AEGIS_CONTROL_PLANE/api/v1/campaigns"
+        fi
+        
+        RESPONSE=$(curl -s -w "\n%{http_code}" \
+          -X POST "$ENDPOINT" \
+          -H "Authorization: Bearer $AEGIS_API_KEY" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD")
+        
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+        
+        if [ "$HTTP_CODE" -ne 201 ] && [ "$HTTP_CODE" -ne 200 ]; then
+          echo "❌ Failed to trigger campaign (HTTP $HTTP_CODE): $BODY"
+          exit 1
+        fi
+        
+        CAMPAIGN_ID=$(echo "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        echo "Campaign ID: $CAMPAIGN_ID"
+        echo "campaign_id=$CAMPAIGN_ID" >> $GITHUB_OUTPUT
+
+    - name: Wait for Campaign Completion
+      id: wait
+      shell: bash
+      env:
+        AEGIS_API_KEY: ${{ inputs.api-key }}
+        AEGIS_CONTROL_PLANE: ${{ inputs.control-plane-url }}
+      run: |
+        CAMPAIGN_ID="${{ steps.trigger.outputs.campaign_id }}"
+        TIMEOUT_SECS=$(( ${{ inputs.timeout-minutes }} * 60 ))
+        ELAPSED=0
+        POLL_INTERVAL=15
+        
+        echo "⏳ Waiting for campaign $CAMPAIGN_ID to complete (timeout: ${{ inputs.timeout-minutes }}m)..."
+        
+        while [ $ELAPSED -lt $TIMEOUT_SECS ]; do
+          RESPONSE=$(curl -s \
+            -H "Authorization: Bearer $AEGIS_API_KEY" \
+            "$AEGIS_CONTROL_PLANE/api/v1/campaigns/$CAMPAIGN_ID")
+          
+          STATUS=$(echo "$RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+          TESTS_RUN=$(echo "$RESPONSE" | grep -o '"tests_run":[0-9]*' | cut -d':' -f2)
+          TOTAL_TESTS=$(echo "$RESPONSE" | grep -o '"total_tests":[0-9]*' | cut -d':' -f2)
+          
+          echo "  Status: $STATUS | Progress: $TESTS_RUN/$TOTAL_TESTS tests"
+          
+          if [ "$STATUS" = "complete" ] || [ "$STATUS" = "failed" ]; then
+            echo "status=$STATUS" >> $GITHUB_OUTPUT
+            break
+          fi
+          
+          sleep $POLL_INTERVAL
+          ELAPSED=$(( ELAPSED + POLL_INTERVAL ))
+        done
+        
+        if [ $ELAPSED -ge $TIMEOUT_SECS ]; then
+          echo "❌ Campaign timed out after ${{ inputs.timeout-minutes }} minutes"
+          exit 1
+        fi
+
+    - name: Evaluate Findings
+      id: evaluate
+      shell: bash
+      env:
+        AEGIS_API_KEY: ${{ inputs.api-key }}
+        AEGIS_CONTROL_PLANE: ${{ inputs.control-plane-url }}
+      run: |
+        CAMPAIGN_ID="${{ steps.trigger.outputs.campaign_id }}"
+        
+        # Fetch findings for this campaign
+        FINDINGS=$(curl -s \
+          -H "Authorization: Bearer $AEGIS_API_KEY" \
+          "$AEGIS_CONTROL_PLANE/api/v1/campaigns/$CAMPAIGN_ID/findings")
+        
+        CRITICAL=$(echo "$FINDINGS" | grep -o '"severity":"CRITICAL"' | wc -l)
+        HIGH=$(echo "$FINDINGS" | grep -o '"severity":"HIGH"' | wc -l)
+        MEDIUM=$(echo "$FINDINGS" | grep -o '"severity":"MEDIUM"' | wc -l)
+        LOW=$(echo "$FINDINGS" | grep -o '"severity":"LOW"' | wc -l)
+        TOTAL=$(( CRITICAL + HIGH + MEDIUM + LOW ))
+        
+        echo "findings_count=$TOTAL" >> $GITHUB_OUTPUT
+        echo "critical_findings=$CRITICAL" >> $GITHUB_OUTPUT
+        echo "high_findings=$HIGH" >> $GITHUB_OUTPUT
+        echo "report_url=https://app.aegisforge.io/campaigns/$CAMPAIGN_ID" >> $GITHUB_OUTPUT
+        
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🛡️  AEGIS FORGE — VALIDATION RESULTS"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  CRITICAL : $CRITICAL"
+        echo "  HIGH     : $HIGH"
+        echo "  MEDIUM   : $MEDIUM"
+        echo "  LOW      : $LOW"
+        echo "  TOTAL    : $TOTAL"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  Report   : https://app.aegisforge.io/campaigns/$CAMPAIGN_ID"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Determine whether to fail the build based on severity threshold
+        FAIL_ON="${{ inputs.fail-on-severity }}"
+        SHOULD_FAIL=false
+        
+        case "$FAIL_ON" in
+          CRITICAL) [ "$CRITICAL" -gt 0 ] && SHOULD_FAIL=true ;;
+          HIGH)     [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ] && SHOULD_FAIL=true ;;
+          MEDIUM)   [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ] && SHOULD_FAIL=true ;;
+          LOW)      [ "$TOTAL" -gt 0 ] && SHOULD_FAIL=true ;;
+        esac
+        
+        if [ "$SHOULD_FAIL" = "true" ]; then
+          echo ""
+          echo "❌ BUILD FAILED: Found $FAIL_ON+ severity findings."
+          echo "   Fix the vulnerabilities and re-push to validate the fixes."
+          echo "   Full evidence: https://app.aegisforge.io/campaigns/$CAMPAIGN_ID"
+          exit 1
+        else
+          echo ""
+          echo "✅ BUILD PASSED: No $FAIL_ON+ severity findings detected."
+          echo "   Commit $GITHUB_SHA is cleared for deployment."
+        fi

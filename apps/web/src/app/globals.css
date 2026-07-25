@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg-base: #020817;
+  --bg-surface: #0f1629;
+  --bg-elevated: #1a2340;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(0, 212, 255, 0.3);
+  --primary: #00d4ff;
+  --primary-dim: rgba(0, 212, 255, 0.15);
+  --accent: #7c3aed;
+  --danger: #ef4444;
+  --warning: #f97316;
+  --caution: #eab308;
+  --success: #22c55e;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+  --glass-bg: rgba(15, 22, 41, 0.7);
+  --glow-primary: 0 0 20px rgba(0, 212, 255, 0.2);
+  --glow-danger: 0 0 20px rgba(239, 68, 68, 0.2);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 212, 255, 0.06), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(124, 58, 237, 0.05), transparent);
+}
+
+/* Glass panel */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Severity badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.badge-critical { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.badge-high { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); }
+.badge-medium { background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3); }
+.badge-low { background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); }
+.badge-info { background: rgba(0, 212, 255, 0.15); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.3); }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; border: none; text-decoration: none; }
+.btn-primary { background: var(--primary); color: #020817; }
+.btn-primary:hover { background: #33dcff; box-shadow: var(--glow-primary); transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--border-hover); color: var(--text-primary); }
+.btn-danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+
+/* Input */
+.input { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.2s; width: 100%; }
+.input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Code */
+code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+/* Gradient heading */
+.gradient-text {
+  background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 212, 255, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(0, 212, 255, 0.6); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.3s ease forwards; }
+
+/* Status dot */
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.running { background: var(--primary); animation: pulse-glow 2s infinite; }
+.status-dot.complete { background: var(--success); }
+.status-dot.failed { background: var(--danger); }
+.status-dot.pending { background: var(--text-muted); }

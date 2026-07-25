@@ -18,7 +18,7 @@ func Middleware(cfg *config.Config) func(http.Handler) http.Handler {
 				return
 			}
 
-			// In a real app, use jwks logic to validate the RS256 token against Auth0Domain
+			// In a real app, use jwks logic to validate the RS256 token against Clerk's JSON Web Key Set (JWKS)
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 			_ = tokenString 
 

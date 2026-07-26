@@ -41,39 +41,10 @@ type Server struct {
 
 func New(cfg *config.Config) *Server {
 	s := &Server{
-		cfg:    cfg,
-		router: chi.NewRouter(),
-		campaigns: []Campaign{
-			{
-				ID:            "1",
-				Name:          "Continuous Hardening Loop",
-				TargetAgentID: "agent_fin_advisor_01",
-				Status:        "Running",
-				TotalTests:    12,
-				TestsRun:      8,
-				FindingsCount: 1,
-				CreatedAt:     time.Now().Add(-2 * time.Hour),
-			},
-			{
-				ID:            "2",
-				Name:          "Q3 Prompt Injection Baseline",
-				TargetAgentID: "CustomerSupport-Bot",
-				Status:        "Complete",
-				TotalTests:    20,
-				TestsRun:      20,
-				FindingsCount: 0,
-				CreatedAt:     time.Now().Add(-24 * time.Hour),
-			},
-		},
-		findings: []Finding{
-			{
-				ID:        "1",
-				Title:     "Honeyfact Exfiltration Leakage detected in Database Execution Query Tool",
-				Severity:  "CRITICAL",
-				AgentName: "Enterprise Financial Advisor Agent",
-				CreatedAt: time.Now().Add(-2 * time.Hour),
-			},
-		},
+		cfg:       cfg,
+		router:    chi.NewRouter(),
+		campaigns: []Campaign{},
+		findings:  []Finding{},
 	}
 	s.setupMiddleware()
 	s.setupRoutes()

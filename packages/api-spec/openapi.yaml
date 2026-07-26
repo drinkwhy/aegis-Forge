@@ -1,0 +1,535 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: AegisAgent - AI Agent Security Firewall API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: proxy
+    description: Security proxy operations
+  - name: execute
+    description: Capability-gated execution operations
+  - name: rules
+    description: Security rules management
+  - name: logs
+    description: Security event log
+  - name: stats
+    description: Security statistics
+  - name: agent-keys
+    description: Agent API key management
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /proxy:
+    post:
+      operationId: proxyRequest
+      tags: [proxy]
+      summary: Security proxy endpoint
+      description: >
+        Intercepts and inspects outgoing AI agent requests against security rules.
+        Accepts either a Clerk session cookie (browser) or X-AegisAgent-Key header (external agents).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProxyInput"
+      responses:
+        "200":
+          description: Request allowed through
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyResult"
+        "403":
+          description: Request blocked by security rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyResult"
+
+  /execute:
+    post:
+      operationId: executeRequest
+      tags: [execute]
+      summary: Capability-gated outbound execution endpoint
+      description: >
+        Consumes a short-lived one-time capability token issued by /proxy and forwards
+        the exact approved outbound request. Deployment-level bypass prevention still
+        requires routing credentials or egress permissions exclusively through Aegis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteInput"
+      responses:
+        "200":
+          description: Upstream response envelope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteResult"
+        "403":
+          description: Capability missing, expired, consumed, or mismatched
+
+  /rules:
+    get:
+      operationId: getRules
+      tags: [rules]
+      summary: Get all security rules for the authenticated user
+      responses:
+        "200":
+          description: List of security rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SecurityRule"
+
+  /rules/{id}:
+    patch:
+      operationId: updateRule
+      tags: [rules]
+      summary: Update a security rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleUpdate"
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityRule"
+        "404":
+          description: Rule not found
+
+  /logs:
+    get:
+      operationId: getLogs
+      tags: [logs]
+      summary: Get security event log for the authenticated user
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Security log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogEntry"
+    delete:
+      operationId: clearLogs
+      tags: [logs]
+      summary: Clear all security log entries for the authenticated user
+      responses:
+        "200":
+          description: Logs cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearLogsResult"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get security statistics for the authenticated user
+      responses:
+        "200":
+          description: Security statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityStats"
+
+  /agent-keys:
+    get:
+      operationId: getAgentKeys
+      tags: [agent-keys]
+      summary: List all agent API keys for the authenticated user
+      responses:
+        "200":
+          description: List of agent API keys
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentKey"
+    post:
+      operationId: createAgentKey
+      tags: [agent-keys]
+      summary: Create a new agent API key
+      description: Returns the raw key once at creation time — it cannot be retrieved again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentKeyInput"
+      responses:
+        "201":
+          description: Created API key (includes raw key, shown only once)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentKeyCreated"
+
+  /agent-keys/{id}:
+    delete:
+      operationId: deleteAgentKey
+      tags: [agent-keys]
+      summary: Revoke an agent API key
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Key revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeKeyResult"
+        "404":
+          description: Key not found
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    ProxyInput:
+      type: object
+      required: [destination, payload, agentTask]
+      properties:
+        destination:
+          type: string
+          description: Target URL the agent is trying to call
+        agentTask:
+          type: string
+          description: Human-readable description of what the agent is doing
+        payload:
+          type: object
+          description: The request payload the agent is sending
+          additionalProperties: true
+        agentSessionId:
+          type: string
+          description: Stable agent session identifier used for session-bound deception honeytokens and honeyfacts
+        toolName:
+          type: string
+          description: Stable name of the tool the agent intends to invoke
+        toolAction:
+          type: string
+          description: Human-readable description of the requested tool action
+        humanApproved:
+          type: boolean
+          deprecated: true
+          description: Deprecated and ignored. Use approvalId from a server-created approval request.
+        approvalId:
+          type: string
+          description: Server-created approval request ID, cryptographically bound to this exact action
+        credentialRef:
+          type: string
+          description: Stable brokered credential reference. Raw credential material is never returned to the agent.
+        amount:
+          type: ["number", "null"]
+          description: Monetary amount involved in the transaction
+
+    ProxyResult:
+      type: object
+      required: [allowed, message, logId]
+      properties:
+        approvalRequestId:
+          type: string
+          description: ID to present for human review and resubmit as approvalId after approval
+        allowed:
+          type: boolean
+        message:
+          type: string
+        logId:
+          type: string
+        severity:
+          type: string
+          enum: [INFO, LOW, MEDIUM, HIGH, CRITICAL]
+        violation:
+          oneOf:
+            - $ref: "#/components/schemas/SecurityViolation"
+            - type: "null"
+        capabilityToken:
+          type: string
+          description: Short-lived bearer capability for /execute. Present only when allowed.
+        execution:
+          type: object
+          additionalProperties: true
+        credential:
+          type: object
+          additionalProperties: true
+          description: Credential metadata safe for clients. Never includes plaintext secrets.
+        guardrails:
+          type: object
+          additionalProperties: true
+
+    ExecuteInput:
+      type: object
+      required: [capabilityToken, destination, agentTask, payload]
+      properties:
+        capabilityToken:
+          type: string
+        destination:
+          type: string
+        agentTask:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        agentSessionId:
+          type: string
+        toolName:
+          type: string
+        toolAction:
+          type: string
+        amount:
+          type: ["number", "null"]
+        method:
+          type: string
+        credentialRef:
+          type: string
+          description: Brokered credential reference bound to the capability.
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        body:
+          description: JSON or text body to forward
+        requiredScopes:
+          type: array
+          items:
+            type: string
+          description: Optional additional scopes the execution endpoint must require from the capability.
+
+    ExecuteResult:
+      type: object
+      required: [status, statusText, headers, body]
+      properties:
+        status:
+          type: integer
+        statusText:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        body:
+          type: string
+
+    SecurityViolation:
+      type: object
+      required: [ruleId, ruleName, reason]
+      properties:
+        ruleId:
+          type: string
+        ruleName:
+          type: string
+        reason:
+          type: string
+        details:
+          type: ["string", "null"]
+        severity:
+          type: string
+          enum: [INFO, LOW, MEDIUM, HIGH, CRITICAL]
+
+    SecurityRule:
+      type: object
+      required: [id, name, description, enabled, category]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        category:
+          type: string
+          enum: [spend, dlp, malware, network]
+        config:
+          type: object
+          additionalProperties: true
+
+    RuleUpdate:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        config:
+          type: object
+          additionalProperties: true
+
+    LogEntry:
+      type: object
+      required: [id, timestamp, allowed, agentTask, destination, payload]
+      properties:
+        id:
+          type: string
+        agentKeyId:
+          type: ["string", "null"]
+        timestamp:
+          type: string
+          format: date-time
+        allowed:
+          type: boolean
+        agentTask:
+          type: string
+        destination:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        trustScore:
+          type: number
+          nullable: true
+        approvalRequired:
+          type: boolean
+        violationRuleId:
+          type: string
+          nullable: true
+        violationRuleName:
+          type: string
+          nullable: true
+        violationReason:
+          type: string
+          nullable: true
+        severity:
+          type: string
+          enum: [INFO, LOW, MEDIUM, HIGH, CRITICAL]
+        violation:
+          $ref: "#/components/schemas/SecurityViolation"
+
+    ClearLogsResult:
+      type: object
+      required: [cleared]
+      properties:
+        cleared:
+          type: integer
+
+    SecurityStats:
+      type: object
+      required: [totalRequests, allowedRequests, blockedRequests, topViolatedRule, recentActivity]
+      properties:
+        totalRequests:
+          type: integer
+        allowedRequests:
+          type: integer
+        blockedRequests:
+          type: integer
+        approvalRequests:
+          type: integer
+        topViolatedRule:
+          type: ["string", "null"]
+        recentActivity:
+          type: array
+          items:
+            type: object
+            required: [hour, allowed, blocked]
+            properties:
+              hour:
+                type: string
+              allowed:
+                type: integer
+              blocked:
+                type: integer
+
+    AgentKey:
+      type: object
+      required: [id, name, keyPrefix, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        keyPrefix:
+          type: string
+          description: First 12 characters of the key for display purposes
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    AgentKeyCreated:
+      type: object
+      required: [id, name, keyPrefix, rawKey, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        keyPrefix:
+          type: string
+        rawKey:
+          type: string
+          description: Full API key — shown only once at creation
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: ["string", "null"]
+
+    CreateAgentKeyInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Human-readable label for this key (e.g. "LangChain agent – prod")
+          minLength: 1
+
+    RevokeKeyResult:
+      type: object
+      required: [revoked]
+      properties:
+        revoked:
+          type: boolean

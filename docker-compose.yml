@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # ============================================================
+  # PostgreSQL (Metadata & Tenant Data)
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: aegiscruc-postgres
+    environment:
+      POSTGRES_DB: aegisforge
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: localpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d aegisforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # Neo4j (Security Graph Database)
+  # ============================================================
+  neo4j:
+    image: neo4j:5.20-community
+    container_name: aegiscruc-neo4j
+    ports:
+      - "7474:7474" # HTTP UI
+      - "7687:7687" # Bolt protocol
+    environment:
+      - NEO4J_AUTH=neo4j/localpassword
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "localpassword", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # ClickHouse (Telemetry & Event Store)
+  # ============================================================
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    container_name: aegiscruc-clickhouse
+    ports:
+      - "8123:8123" # HTTP port
+      - "9000:9000" # Native client port
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  # ============================================================
+  # Redpanda (Kafka-compatible Event Stream Queue)
+  # ============================================================
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.8
+    container_name: aegiscruc-redpanda
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+    ports:
+      - "19092:19092" # External Kafka port
+      - "8082:8082"   # Pandaproxy port
+      - "8081:8081"   # Schema registry port
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+
+  # ============================================================
+  # HashiCorp Vault (Credential Proxy & Secrets Management)
+  # ============================================================
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: aegiscruc-vault
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=root
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+
+volumes:
+  postgres_data:
+  neo4j_data:
+  clickhouse_data:
+  redpanda_data:

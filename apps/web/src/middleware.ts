@@ -1,11 +1,11 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
-const isProtectedRoute = createRouteMatcher(['/dashboard(.*)'])
+const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)', '/api/v1/health'])
 
 export default clerkMiddleware(async (auth, req) => {
-  // Allow static page generation compilation to pass without redirecting
-  if (process.env.NEXT_PHASE === 'phase-production-build') return
-  if (isProtectedRoute(req)) await auth.protect()
+  if (!isPublicRoute(req)) {
+    await auth.protect()
+  }
 })
 
 export const config = {

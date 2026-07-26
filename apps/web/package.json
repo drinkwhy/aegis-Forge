@@ -11,12 +11,14 @@
   "dependencies": {
     "@clerk/nextjs": "^6.9.6",
     "@clerk/themes": "^2.4.57",
+    "@types/three": "^0.185.1",
     "d3": "^7.9.0",
     "lucide-react": "^0.460.0",
     "next": "15.3.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "swr": "^2.2.5"
+    "swr": "^2.2.5",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

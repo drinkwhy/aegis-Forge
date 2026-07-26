@@ -20,10 +20,10 @@ interface Props {
 }
 
 const NODE_COLORS: Record<GraphNode['type'], string> = {
-  agent: 'var(--primary)',
-  mcp: 'var(--accent)',
-  database: 'var(--caution)',
-  tool: 'var(--text-muted)',
+  agent: '#00d4ff',    // Electric Cyan
+  mcp: '#7c3aed',      // Violet
+  database: '#f97316', // High Orange / Caution
+  tool: '#94a3b8',     // Muted Blue-Grey
 };
 
 export function AttackPathGraph({ nodes, links }: Props) {
@@ -45,8 +45,9 @@ export function AttackPathGraph({ nodes, links }: Props) {
       .attr('height', '100%')
       .attr('viewBox', [0, 0, width, height].join(' '));
 
-    // Arrow marker definition
     const defs = svg.append('defs');
+
+    // Arrow marker definition
     defs
       .append('marker')
       .attr('id', 'arrowhead')
@@ -59,15 +60,35 @@ export function AttackPathGraph({ nodes, links }: Props) {
       .attr('xoverflow', 'visible')
       .append('svg:path')
       .attr('d', 'M 0,-5 L 10,0 L 0,5')
-      .attr('fill', 'var(--text-muted)')
+      .attr('fill', 'rgba(255, 255, 255, 0.4)')
       .style('stroke', 'none');
+
+    // Create glow filters for each color
+    Object.entries(NODE_COLORS).forEach(([type, color]) => {
+      const filter = defs
+        .append('filter')
+        .attr('id', `glow-${type}`)
+        .attr('x', '-50%')
+        .attr('y', '-50%')
+        .attr('width', '200%')
+        .attr('height', '200%');
+
+      filter
+        .append('feGaussianBlur')
+        .attr('stdDeviation', '6')
+        .attr('result', 'blur');
+
+      const feMerge = filter.append('feMerge');
+      feMerge.append('feMergeNode').attr('in', 'blur');
+      feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+    });
 
     const g = svg.append('g');
 
     // Zoom + pan
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 4])
+      .scaleExtent([0.2, 4])
       .on('zoom', (e) => g.attr('transform', e.transform.toString()));
     svg.call(zoom);
 
@@ -79,21 +100,51 @@ export function AttackPathGraph({ nodes, links }: Props) {
         d3
           .forceLink<GraphNode, GraphLink>(links)
           .id((d) => d.id)
-          .distance(140)
+          .distance(150)
       )
-      .force('charge', d3.forceManyBody().strength(-450))
+      .force('charge', d3.forceManyBody().strength(-500))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide(30));
+      .force('collision', d3.forceCollide(40));
 
-    // Links
-    const link = g
-      .append('g')
-      .selectAll<SVGLineElement, GraphLink>('line')
+    // Links container
+    const linkGroup = g.append('g').attr('class', 'links');
+
+    // Underlay links (the background line)
+    const link = linkGroup
+      .selectAll<SVGLineElement, GraphLink>('.link-base')
       .data(links)
       .join('line')
-      .attr('stroke', 'rgba(255,255,255,0.12)')
-      .attr('stroke-width', 1.5)
+      .attr('class', 'link-base')
+      .attr('stroke', 'rgba(255, 255, 255, 0.08)')
+      .attr('stroke-width', 2)
       .attr('marker-end', 'url(#arrowhead)');
+
+    // Animated dash overlays (simulating packet flows)
+    const linkPulse = linkGroup
+      .selectAll<SVGLineElement, GraphLink>('.link-pulse')
+      .data(links)
+      .join('line')
+      .attr('class', 'link-pulse')
+      .attr('stroke', 'var(--primary)')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '8, 20')
+      .attr('stroke-linecap', 'round')
+      .style('mix-blend-mode', 'screen')
+      .style('opacity', 0.8);
+
+    // Add CSS keyframe animation for the pulse movement
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes pulseFlow {
+        to {
+          stroke-dashoffset: -40;
+        }
+      }
+      .link-pulse {
+        animation: pulseFlow 2s linear infinite;
+      }
+    `;
+    document.head.appendChild(style);
 
     // Link labels
     const linkLabel = g
@@ -105,7 +156,8 @@ export function AttackPathGraph({ nodes, links }: Props) {
       .attr('font-size', '10px')
       .attr('font-family', 'Inter, sans-serif')
       .attr('fill', 'var(--text-muted)')
-      .attr('text-anchor', 'middle');
+      .attr('text-anchor', 'middle')
+      .style('pointer-events', 'none');
 
     // Node groups
     const node = g
@@ -133,37 +185,98 @@ export function AttackPathGraph({ nodes, links }: Props) {
           })
       );
 
-    // Node shapes by type
+    // Interactive Hover States
+    node.on('mouseenter', function (event, d) {
+      // Dim all nodes & links
+      node.style('opacity', 0.35);
+      link.style('stroke', 'rgba(255, 255, 255, 0.03)');
+      linkPulse.style('opacity', 0.1);
+
+      // Highlight hovered node
+      d3.select(this)
+        .transition()
+        .duration(200)
+        .style('opacity', 1)
+        .attr('transform', `scale(1.15)`);
+
+      // Highlight direct connections
+      const connectedNodeIds = new Set<string>();
+      links.forEach((l) => {
+        const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+        const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+
+        if (sourceId === d.id) {
+          connectedNodeIds.add(targetId);
+        } else if (targetId === d.id) {
+          connectedNodeIds.add(sourceId);
+        }
+      });
+
+      node.filter((n) => connectedNodeIds.has(n.id)).style('opacity', 0.95);
+      
+      link
+        .filter((l) => {
+          const sId = typeof l.source === 'object' ? l.source.id : l.source;
+          const tId = typeof l.target === 'object' ? l.target.id : l.target;
+          return sId === d.id || tId === d.id;
+        })
+        .attr('stroke', 'rgba(255, 255, 255, 0.4)')
+        .attr('stroke-width', 2.5);
+
+      linkPulse
+        .filter((l) => {
+          const sId = typeof l.source === 'object' ? l.source.id : l.source;
+          const tId = typeof l.target === 'object' ? l.target.id : l.target;
+          return sId === d.id || tId === d.id;
+        })
+        .style('opacity', 1)
+        .attr('stroke-width', 3);
+    });
+
+    node.on('mouseleave', function () {
+      node.transition().duration(200).style('opacity', 1).attr('transform', 'scale(1)');
+      link.attr('stroke', 'rgba(255, 255, 255, 0.08)').attr('stroke-width', 2);
+      linkPulse.style('opacity', 0.8).attr('stroke-width', 2);
+    });
+
+    // Node shapes by type with custom neon glow filters
     node.each(function (d) {
       const el = d3.select(this);
       const color = NODE_COLORS[d.type];
 
       if (d.type === 'agent') {
-        el.append('circle').attr('r', 18).attr('fill', color).attr('fill-opacity', 0.9);
-        // Glow ring
         el.append('circle')
-          .attr('r', 22)
+          .attr('r', 16)
+          .attr('fill', color)
+          .attr('filter', `url(#glow-agent)`)
+          .style('opacity', 0.9);
+        el.append('circle')
+          .attr('r', 20)
           .attr('fill', 'none')
           .attr('stroke', color)
-          .attr('stroke-opacity', 0.3)
+          .attr('stroke-opacity', 0.4)
           .attr('stroke-width', 2);
       } else if (d.type === 'mcp') {
         el.append('rect')
-          .attr('width', 30)
-          .attr('height', 30)
-          .attr('x', -15)
-          .attr('y', -15)
+          .attr('width', 28)
+          .attr('height', 28)
+          .attr('x', -14)
+          .attr('y', -14)
           .attr('rx', 6)
           .attr('fill', color)
-          .attr('fill-opacity', 0.9);
+          .attr('filter', `url(#glow-mcp)`)
+          .style('opacity', 0.9);
       } else if (d.type === 'database') {
         el.append('polygon')
-          .attr('points', '0,-20 20,0 0,20 -20,0')
+          .attr('points', '0,-18 18,0 0,18 -18,0')
           .attr('fill', color)
-          .attr('fill-opacity', 0.9);
+          .attr('filter', `url(#glow-database)`)
+          .style('opacity', 0.9);
       } else {
-        // tool — small circle
-        el.append('circle').attr('r', 10).attr('fill', color).attr('fill-opacity', 0.7);
+        el.append('circle')
+          .attr('r', 10)
+          .attr('fill', color)
+          .style('opacity', 0.85);
       }
     });
 
@@ -175,16 +288,18 @@ export function AttackPathGraph({ nodes, links }: Props) {
       .attr('font-size', '11px')
       .attr('font-family', 'Inter, sans-serif')
       .attr('fill', 'var(--text-secondary)')
-      .attr('text-anchor', 'middle');
-
-    // Hover tooltip
-    node
-      .append('title')
-      .text((d) => d.id + ' [' + d.type + ']');
+      .attr('text-anchor', 'middle')
+      .style('user-select', 'none');
 
     // Tick update — translate nodes, update links
     simulation.on('tick', () => {
       link
+        .attr('x1', (d) => (d.source as GraphNode).x ?? 0)
+        .attr('y1', (d) => (d.source as GraphNode).y ?? 0)
+        .attr('x2', (d) => (d.target as GraphNode).x ?? 0)
+        .attr('y2', (d) => (d.target as GraphNode).y ?? 0);
+
+      linkPulse
         .attr('x1', (d) => (d.source as GraphNode).x ?? 0)
         .attr('y1', (d) => (d.source as GraphNode).y ?? 0)
         .attr('x2', (d) => (d.target as GraphNode).x ?? 0)
@@ -199,6 +314,7 @@ export function AttackPathGraph({ nodes, links }: Props) {
 
     return () => {
       simulation.stop();
+      if (style.parentNode) style.parentNode.removeChild(style);
     };
   }, [nodes, links]);
 

@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS "action_fixtures" (
+  "id" text PRIMARY KEY NOT NULL,
+  "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+  "name" text NOT NULL,
+  "agent" text NOT NULL,
+  "action" text NOT NULL,
+  "method" text NOT NULL DEFAULT 'POST',
+  "destination" text NOT NULL,
+  "target_host" text NOT NULL,
+  "headers" jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "payload" jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "data_context" text,
+  "expected_decision" text NOT NULL,
+  "last_actual_decision" text,
+  "last_trust_score" text,
+  "last_run_at" timestamp,
+  "last_result" jsonb,
+  "created_at" timestamp NOT NULL DEFAULT now(),
+  "updated_at" timestamp NOT NULL DEFAULT now()
+);

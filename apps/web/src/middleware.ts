@@ -3,6 +3,8 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 const isProtectedRoute = createRouteMatcher(['/dashboard(.*)'])
 
 export default clerkMiddleware(async (auth, req) => {
+  // Allow static page generation compilation to pass without redirecting
+  if (process.env.NEXT_PHASE === 'phase-production-build') return
   if (isProtectedRoute(req)) await auth.protect()
 })
 

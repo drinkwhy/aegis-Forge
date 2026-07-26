@@ -125,10 +125,10 @@ export default function SettingsPage() {
                   <span className="badge badge-info" style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>Not Connected</span>
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '16px', fontWeight: 500, marginBottom: '4px' }}>Auth0</h4>
+                  <h4 style={{ fontSize: '16px', fontWeight: 500, marginBottom: '4px' }}>Clerk</h4>
                   <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>SSO and identity management for team access.</p>
                 </div>
-                <button className="btn btn-primary" style={{ marginTop: 'auto' }}>Connect</button>
+                <button className="btn btn-ghost" style={{ marginTop: 'auto' }}>Configure</button>
               </div>
             </div>
           )}

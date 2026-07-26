@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, 
+  Activity,
   Play, 
   ShieldAlert, 
   Network, 
@@ -12,6 +13,7 @@ import {
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: '3D Anatomy', href: '/dashboard/anatomy', icon: Activity },
   { name: 'Campaigns', href: '/dashboard/campaigns', icon: Play },
   { name: 'Findings', href: '/dashboard/findings', icon: ShieldAlert },
   { name: 'Assets', href: '/dashboard/assets', icon: Network },

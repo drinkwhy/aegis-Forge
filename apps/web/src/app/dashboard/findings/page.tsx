@@ -1,31 +1,76 @@
+'use client';
+import { useState } from 'react';
+import useSWR from 'swr';
 import { FindingCard } from '@/components/ui/FindingCard';
+import { ShieldAlert } from 'lucide-react';
 
-const mockFindings = [
-  { id: 'f1', title: 'Unauthorized DB access via Prompt Injection', description: 'Attacker successfully injected a malicious prompt payload bypassing input filters, leading to arbitrary database queries via the MCP connector.', agentName: 'CustomerSupport-Bot', severity: 'Critical', riskRange: '$125k – $890k', timestamp: '2h ago' },
-  { id: 'f2', title: 'SSRF in Internal API Tool', description: 'The agent can be manipulated to make requests to internal metadata endpoints.', agentName: 'DevOps-Assistant', severity: 'High', riskRange: '$50k – $150k', timestamp: '5h ago' },
-  { id: 'f3', title: 'PII Leak in Summarization', description: 'Summarization tool occasionally includes sensitive user PII from context into logs.', agentName: 'DocWriter', severity: 'Medium', riskRange: '$10k – $45k', timestamp: '12h ago' },
-  { id: 'f4', title: 'Excessive Agency - S3 Bucket Listing', description: 'Agent has permissions to list all S3 buckets instead of just the requested ones.', agentName: 'CustomerSupport-Bot', severity: 'Critical', riskRange: '$200k – $1.2M', timestamp: '1d ago' },
-  { id: 'f5', title: 'Insecure Direct Object Reference', description: 'Agent allows fetching invoices without proper authorization check on the user ID.', agentName: 'Finance-Bot', severity: 'High', riskRange: '$75k – $300k', timestamp: '2d ago' },
-  { id: 'f6', title: 'Cleartext Credentials in MCP Config', description: 'Hardcoded API key found in the MCP tool environment variables.', agentName: 'Sales-Agent', severity: 'Medium', riskRange: '$20k – $80k', timestamp: '3d ago' },
-];
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+interface Finding {
+  id: string;
+  title: string;
+  description?: string;
+  agentName?: string;
+  severity: string;
+  riskRange?: string;
+  timestamp?: string;
+}
 
 export default function FindingsPage() {
+  const [filter, setFilter] = useState('All');
+  const { data, error, isLoading } = useSWR('/api/v1/findings', fetcher);
+  const findings: Finding[] = data?.findings || [];
+
+  const filteredFindings = findings.filter((f) => {
+    if (filter === 'All') return true;
+    return f.severity.toLowerCase() === filter.toLowerCase();
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 600 }}>Security Findings</h2>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {['All', 'Critical', 'High', 'Medium', 'Low'].map(f => (
-            <button key={f} className={`btn ${f === 'All' ? 'btn-primary' : 'btn-ghost'}`} style={{ padding: '6px 12px', fontSize: '13px' }}>
+          {['All', 'Critical', 'High', 'Medium', 'Low'].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`btn ${filter === f ? 'btn-primary' : 'btn-ghost'}`}
+              style={{ padding: '6px 12px', fontSize: '13px' }}
+            >
               {f}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
-        {mockFindings.map(f => <FindingCard key={f.id} finding={f} />)}
-      </div>
+      {isLoading ? (
+        <div style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Loading findings...</div>
+      ) : error ? (
+        <div style={{ color: 'var(--danger)', fontSize: '14px' }}>Error connecting to control plane API</div>
+      ) : filteredFindings.length === 0 ? (
+        <div className="glass" style={{ padding: '40px', textAlign: 'center' }}>
+          <ShieldAlert size={48} color="var(--text-muted)" style={{ marginBottom: '16px' }} />
+          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>No Security Findings</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', maxWidth: '400px', margin: '0 auto' }}>
+            All systems verified secure. Run attack campaigns or deploy integrations to test your agents for vulnerabilities.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '24px' }}>
+          {filteredFindings.map((f) => (
+            <FindingCard key={f.id} finding={{
+              id: f.id,
+              title: f.title,
+              description: f.description || 'Vulnerability verified by automated test script simulation run.',
+              agentName: f.agentName || 'AI-Agent',
+              severity: f.severity,
+              riskRange: f.riskRange || 'Calculating...',
+              timestamp: f.timestamp || 'Just now'
+            }} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

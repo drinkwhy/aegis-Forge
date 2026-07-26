@@ -1,4 +1,5 @@
 import anthropic
+import httpx
 from .models import GenerateRequest, GeneratedPayload, TargetProfile, CorpusEntry
 from .config import settings
 import structlog
@@ -33,7 +34,12 @@ Output your response as a JSON object with this exact structure:
 
 class AttackerAgent:
     def __init__(self):
-        self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        if settings.openrouter_api_key:
+            self.use_openrouter = True
+            self.client = httpx.AsyncClient()
+        else:
+            self.use_openrouter = False
+            self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     
     async def generate(self, request: GenerateRequest, corpus_entry: CorpusEntry) -> GeneratedPayload:
         target = request.target
@@ -71,14 +77,43 @@ Focus on: {request.previous_result.get('block_reason', 'unknown guardrail')}"""
                  corpus_entry=corpus_entry.id,
                  attempt=request.attempt_number)
         
-        response = self.client.messages.create(
-            model="claude-opus-4-5",
-            max_tokens=settings.max_tokens_per_payload,
-            system=ATTACKER_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}]
-        )
+        content = ""
+        input_tokens = 0
+        output_tokens = 0
         
-        content = response.content[0].text
+        if self.use_openrouter:
+            headers = {
+                "Authorization": f"Bearer {settings.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://aegisforge.io",
+                "X-Title": "Aegis Forge"
+            }
+            payload = {
+                "model": "anthropic/claude-3.5-sonnet",
+                "messages": [
+                    {"role": "system", "content": ATTACKER_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "max_tokens": settings.max_tokens_per_payload
+            }
+            res = await self.client.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=60.0)
+            res.raise_for_status()
+            res_json = res.json()
+            content = res_json["choices"][0]["message"]["content"]
+            usage = res_json.get("usage", {})
+            input_tokens = usage.get("prompt_tokens", 0)
+            output_tokens = usage.get("completion_tokens", 0)
+        else:
+            response = self.client.messages.create(
+                model="claude-opus-4-5",
+                max_tokens=settings.max_tokens_per_payload,
+                system=ATTACKER_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+            content = response.content[0].text
+            input_tokens = response.usage.input_tokens
+            output_tokens = response.usage.output_tokens
+        
         # Parse JSON from response
         try:
             parsed = json.loads(content)
@@ -105,8 +140,8 @@ Focus on: {request.previous_result.get('block_reason', 'unknown guardrail')}"""
             metadata={
                 "attack_vector": parsed.get("attack_vector", ""),
                 "stealth_notes": parsed.get("stealth_notes", ""),
-                "model": "claude-opus-4-5",
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
+                "model": "anthropic/claude-3.5-sonnet" if self.use_openrouter else "claude-opus-4-5",
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
             }
         )

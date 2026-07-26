@@ -1,7 +1,8 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    anthropic_api_key: str
+    anthropic_api_key: str = ""
+    openrouter_api_key: str = ""
     control_plane_url: str = "http://control-plane:8080"
     corpus_path: str = "/corpus"
     max_tokens_per_payload: int = 2000

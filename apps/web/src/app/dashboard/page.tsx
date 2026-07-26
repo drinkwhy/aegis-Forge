@@ -3,7 +3,19 @@ import { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { StatCard } from '@/components/ui/StatCard';
 import { SeverityBadge } from '@/components/ui/SeverityBadge';
-import { IntelligenceAnatomy3D } from '@/components/3d/IntelligenceAnatomy3D';
+import dynamic from 'next/dynamic';
+
+const IntelligenceAnatomy3D = dynamic(
+  () => import('@/components/3d/IntelligenceAnatomy3D').then((m) => m.IntelligenceAnatomy3D),
+  { 
+    ssr: false, 
+    loading: () => (
+      <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+        Loading 3D Anatomy Engine...
+      </div>
+    ) 
+  }
+);
 import { 
   Activity, 
   ShieldAlert, 

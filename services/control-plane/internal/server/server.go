@@ -31,20 +31,39 @@ type Finding struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+type ProposedFix struct {
+	Patch  string `json:"patch,omitempty"`
+	Prompt string `json:"prompt,omitempty"`
+}
+
+type Remediation struct {
+	ID           string      `json:"id"`
+	FindingID    string      `json:"finding_id"`
+	FindingTitle string      `json:"finding_title"`
+	Severity     string      `json:"severity"`
+	FixType      string      `json:"fix_type"`
+	ProposedFix  ProposedFix `json:"proposed_fix"`
+	PRURL        string      `json:"pr_url,omitempty"`
+	Status       string      `json:"status"`
+	ProposedAt   time.Time   `json:"proposed_at"`
+}
+
 type Server struct {
 	cfg           *config.Config
 	router        *chi.Mux
 	mu            sync.Mutex
 	campaigns     []Campaign
 	findings      []Finding
+	remediations  []Remediation
 }
 
 func New(cfg *config.Config) *Server {
 	s := &Server{
-		cfg:       cfg,
-		router:    chi.NewRouter(),
-		campaigns: []Campaign{},
-		findings:  []Finding{},
+		cfg:          cfg,
+		router:       chi.NewRouter(),
+		campaigns:    []Campaign{},
+		findings:     []Finding{},
+		remediations: []Remediation{},
 	}
 	s.setupMiddleware()
 	s.setupRoutes()
@@ -88,6 +107,8 @@ func (s *Server) setupRoutes() {
 				
 				r.Get("/findings", s.listFindings)
 				r.Get("/findings/{findingID}", s.getFinding)
+				
+				r.Get("/remediations", s.listRemediations)
 				
 				r.Post("/roe", s.createRoE)
 				
@@ -156,5 +177,15 @@ func (s *Server) listFindings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getFinding(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }
+
+func (s *Server) listRemediations(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"remediations": s.remediations,
+	})
+}
+
 func (s *Server) createRoE(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }
 func (s *Server) wsStream(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }

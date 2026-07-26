@@ -20,6 +20,10 @@ const nextConfig = {
         destination: 'http://localhost:8080/api/v1/workspaces/d3b07384-d113-4a11-b541-ef81f212239d/findings',
       },
       {
+        source: '/api/v1/remediations',
+        destination: 'http://localhost:8080/api/v1/workspaces/d3b07384-d113-4a11-b541-ef81f212239d/remediations',
+      },
+      {
         source: '/api/v1/:path*',
         destination: 'http://localhost:8080/api/v1/:path*',
       },

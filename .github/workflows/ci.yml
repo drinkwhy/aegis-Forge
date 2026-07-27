@@ -94,30 +94,31 @@ jobs:
   nextjs-build:
     name: Next.js Build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm --filter web run lint
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: pnpm --filter web exec tsc --noEmit
 
       - name: Build
-        run: npm run build
+        run: pnpm --filter web run build
         env:
           NEXT_PUBLIC_API_URL: https://api.aegiscruc.io
           AUTH0_BASE_URL: https://app.aegiscruc.io

@@ -43,7 +43,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>Global Webhook URL (Findings)</label>
-                <input type="text" className="input" defaultValue="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX" />
+                <input type="text" className="input" defaultValue="https://hooks.slack.com/services/YOUR_WORKSPACE_ID/YOUR_WEBHOOK_TOKEN" />
               </div>
               <button className="btn btn-primary" style={{ width: 'fit-content' }}>Save Changes</button>
             </div>

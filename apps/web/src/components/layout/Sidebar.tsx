@@ -33,7 +33,7 @@ export function Sidebar() {
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
-        <h1 className="gradient-text" style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '0.05em' }}>AEGIS FORGE</h1>
+        <h1 className="gradient-text" style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.05em' }}>AEGIS CRUCIBLE</h1>
       </div>
       
       <nav style={{ flex: 1, padding: '0 12px' }}>
@@ -70,12 +70,13 @@ export function Sidebar() {
 
       <div style={{ padding: '24px', borderTop: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>US</span>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border)', position: 'relative' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700 }}>AC</span>
+            <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '10px', height: '10px', borderRadius: '50%', background: 'var(--success)', border: '2px solid var(--bg-surface)' }} className="radar-pulse" />
           </div>
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            <div style={{ fontSize: '14px', fontWeight: 500, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Acme Corp Workspace</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Pro Plan</div>
+            <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>Acme Workspace</div>
+            <div style={{ fontSize: '11px', color: 'var(--cyan)', fontWeight: 600, letterSpacing: '0.05em' }}>CONNECTED</div>
           </div>
         </div>
       </div>

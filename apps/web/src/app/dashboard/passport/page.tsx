@@ -5,19 +5,20 @@ import { AssuranceRing } from '@/components/passport/AssuranceRing';
 import { SystemOrbit } from '@/components/passport/SystemOrbit';
 import { 
   ShieldCheck, 
+  ShieldAlert,
   RefreshCw, 
-  AlertTriangle, 
   ExternalLink, 
   Lock, 
   FileCheck, 
-  History, 
+  Terminal, 
   Server, 
-  Eye, 
   CheckCircle,
-  HelpCircle,
-  Flame,
-  UserCheck
+  Copy,
+  Layers,
+  Database,
+  ArrowRight
 } from 'lucide-react';
+import Link from 'next/link';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -29,18 +30,10 @@ interface TestClaim {
   description: string;
 }
 
-interface PassportException {
-  requirementId: string;
-  justification: string;
-  approvedBy: string;
-  expiresAt: string;
-  compensatingControl: string;
-  residualRisk: string;
-}
-
 export default function PassportPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const orgID = 'd3b07384-d113-4a11-b541-ef81f212239e';
   
@@ -49,7 +42,6 @@ export default function PassportPage() {
   const passportList = passportsData || [];
   const activePassport = passportList[0];
 
-  // If no passport exists in the DB, fallback to clean mock data matching bootstrap structure
   const passport = activePassport ? {
     passportId: activePassport.passportId,
     passportVersion: activePassport.passportVersion,
@@ -67,7 +59,7 @@ export default function PassportPage() {
     deploymentDigest: 'sha256:' + activePassport.subjectFingerprint.slice(0, 24),
     lastDriftCheck: new Date(activePassport.issuedAt).toLocaleString(),
     hasDrift: activePassport.status === 'REVOKED' || activePassport.overallScore < 0.85,
-    isHeartbeatOffline: activePassport.overallScore < 0.50, // mock rule based on score
+    isHeartbeatOffline: activePassport.overallScore < 0.50,
   } : {
     passportId: 'pass_01JA98BD192X0192A',
     passportVersion: '1.0',
@@ -81,7 +73,7 @@ export default function PassportPage() {
     frameworkFingerprint: 'fw_8fa21c4de8e441c9',
     subjectFingerprint: '8fa21c4de8e441c9902ba98e102f4cc889f8162e848de1d9ff02bc4500ea1e84',
     evidenceManifestHash: 'manifest_8fa21c4de8e4',
-    gitCommit: '4dd69883e0f4d62e',
+    gitCommit: '4dd69883e0f4',
     deploymentDigest: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     lastDriftCheck: '2026-08-05T01:10:00-05:00',
     hasDrift: false,
@@ -96,361 +88,253 @@ export default function PassportPage() {
     { id: '5', title: 'Privilege Escalation Interception', status: 'passed', evidenceRef: 'ev_pe_05', description: 'Verified that session lease limits restrict token scopes. Attempt to run unauthorized commands rejected.' },
   ];
 
-  const exceptions: PassportException[] = [
-    {
-      requirementId: 'REQ-MCP-08',
-      justification: 'Legacy read-only CRM data sync MCP server is un-sandboxed due to native system library access requirements.',
-      approvedBy: 'Dyllan B. (SecOps Lead)',
-      expiresAt: '2026-11-26',
-      compensatingControl: 'Restricted network egress interface to localhost; token scope strictly set to Read-Only.',
-      residualRisk: 'Low. Network traffic restricted, but local execution vulnerabilities remain inside host network namespace.',
-    }
-  ];
-
-  // Live trigger pipeline: creates snapshot, runs evaluation, and issues new signed passport
-  const triggerDriftCheck = async () => {
+  const handleVerifyDrift = async () => {
     setIsRefreshing(true);
     try {
-      // 1. Create system configuration snapshot
-      const snapshotRes = await fetch(`/api/v1/organizations/${orgID}/systems/agent_fin_advisor_01/snapshots`, {
+      const response = await fetch(`/api/v1/organizations/${orgID}/security-passports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agentCodeCommit: '4dd69883e0f4d62e',
-          modelVersion: 'claude-3-5-sonnet',
-          systemPrompt: 'Filter and mask all customer SSNs and financial secrets on egress.',
-          toolManifests: ['query_db', 'read_file'],
-          lastChecked: new Date().toISOString()
-        })
       });
-      if (!snapshotRes.ok) throw new Error("Failed to create snapshot");
-      const snapshot = await snapshotRes.json();
-
-      // 2. Perform assurance evaluations
-      const evalRes = await fetch(`/api/v1/organizations/${orgID}/assurance-evaluations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          frameworkVersionId: 'fw-v1.4.2-finance',
-          subjectSnapshotId: snapshot.id
-        })
-      });
-      if (!evalRes.ok) throw new Error("Failed to evaluate system posture");
-      const evaluation = await evalRes.json();
-
-      // 3. Issue signed security passport
-      const passportRes = await fetch(`/api/v1/organizations/${orgID}/security-passports`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemId: 'agent_fin_advisor_01',
-          systemDisplayName: 'Enterprise Financial Portfolio Advisor',
-          frameworkId: 'fw-finance-v1',
-          frameworkVersionId: 'fw-v1.4.2-finance',
-          assuranceEvaluationId: evaluation.id
-        })
-      });
-      if (!passportRes.ok) throw new Error("Failed to issue security passport");
-
-      // Mutate and refresh page data
-      await mutate();
+      if (response.ok) {
+        await mutate();
+      }
     } catch (err) {
-      console.error("System recheck failed:", err);
+      console.error(err);
     } finally {
       setIsRefreshing(false);
     }
   };
 
+  const copyEmbedCode = () => {
+    const code = `<a href="http://localhost:3000/verify/passport/${passport.passportId}" target="_blank">\n  <img src="http://localhost:3000/api/shield.svg" alt="Aegis Verified Status"/>\n</a>`;
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getStatusDetails = () => {
+    switch (passport.status) {
+      case 'VALID':
+        return { color: '#10b981', label: 'ACCREDITED & ACTIVE', description: 'System boundaries verified. All continuous hardening criteria fully satisfied.', icon: ShieldCheck };
+      case 'DEGRADED':
+        return { color: '#f97316', label: 'SECURITY WARNING', description: 'Non-blocking drift detected. Telebeat check-in active but validation coverage is reduced.', icon: ShieldAlert };
+      default:
+        return { color: '#ef4444', label: 'ATTESTATION SUSPENDED', description: 'Unresolved critical finding detected. Outbound enforcement disabled or bypassed.', icon: ShieldAlert };
+    }
+  };
+
+  const statusTheme = getStatusDetails();
+  const StatusIcon = statusTheme.icon;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
       
-      {/* Header Panel */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      {/* Top Header Panel */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <h1 style={{ fontSize: '26px', fontWeight: 700 }} className="gradient-text">
-              Security Passport Dashboard
-            </h1>
-            <span style={{ 
-              background: passport.status === 'REVOKED' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.12)', 
-              color: passport.status === 'REVOKED' ? '#ef4444' : '#22c55e', 
-              border: passport.status === 'REVOKED' ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(34, 197, 94, 0.25)', 
-              fontSize: '11px',
-              padding: '2px 10px',
-              borderRadius: '99px',
-              fontWeight: 600
-            }}>
-              {passport.status}
-            </span>
-          </div>
+          <h2 style={{ fontSize: '32px', fontWeight: 800, fontFamily: 'var(--font-display)', letterSpacing: '-0.02em', marginBottom: '4px' }}>
+            Security Passport Console
+          </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Cryptographically signed verification of the active runtime and validation state of {passport.systemDisplayName}.
+            Continuous attestation and cryptographic baseline tracking for AI systems.
           </p>
         </div>
-
+        
         <div style={{ display: 'flex', gap: '12px' }}>
           <button 
-            className="btn btn-ghost"
-            onClick={triggerDriftCheck}
+            className="btn btn-ghost" 
+            onClick={handleVerifyDrift}
             disabled={isRefreshing}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
             <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-            {isRefreshing ? 'Checking System Drift...' : 'Verify System Drift'}
+            {isRefreshing ? 'Verifying Baseline...' : 'Verify System Drift'}
           </button>
           
-          <a 
+          <Link 
             href={`/verify/passport/${passport.passportId}`}
-            target="_blank"
             className="btn btn-primary"
-            style={{ 
-              background: 'linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)',
-              color: '#ffffff',
-              boxShadow: '0 0 15px rgba(0, 212, 255, 0.3)'
-            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
           >
-            <Eye size={14} />
-            Preview Public Passport
-          </a>
+            <ExternalLink size={14} />
+            Public Trust Seal
+          </Link>
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '28px', alignItems: 'start' }}>
+      {/* Main Double Dashboard Column Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px' }}>
         
-        {/* Left Side: Segment Ring & System Orbit */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        {/* Left Column: Attestation and Claims */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           
-          {/* Segment Ring Card */}
-          <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <FileCheck size={18} color="var(--primary)" />
-                Assurance Posture Ring
+          {/* Main Status Cockpit Card */}
+          <div className="glass-card" style={{ padding: '32px', display: 'flex', gap: '28px', alignItems: 'center' }}>
+            <div style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.02)',
+              border: `2px solid ${statusTheme.color}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <StatusIcon size={40} color={statusTheme.color} />
+            </div>
+            
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: statusTheme.color, border: `1px solid ${statusTheme.color}40`, padding: '2px 8px', borderRadius: '4px', fontFamily: 'var(--font-display)', letterSpacing: '0.05em' }}>
+                  {statusTheme.label}
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  ID: {passport.passportId}
+                </span>
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '4px' }}>
+                {passport.systemDisplayName}
               </h3>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Segment breakdown of system safety verification criteria.
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                {statusTheme.description}
               </p>
             </div>
+          </div>
+
+          {/* Attestation Blocks - Cryptographic Ledger Details */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <Terminal size={18} color="var(--cyan)" />
+                <h4 style={{ fontSize: '15px', fontWeight: 600, fontFamily: 'var(--font-display)' }}>System Configuration</h4>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Git Code Commit</div>
+                  <code style={{ fontSize: '12px', color: 'var(--text-primary)', display: 'block', background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                    {passport.gitCommit}
+                  </code>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Deployment Digest</div>
+                  <code style={{ fontSize: '12px', color: 'var(--text-primary)', display: 'block', background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--border)', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                    {passport.deploymentDigest}
+                  </code>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <Database size={18} color="var(--primary)" />
+                <h4 style={{ fontSize: '15px', fontWeight: 600, fontFamily: 'var(--font-display)' }}>Framework Fingerprints</h4>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Required Rules Checklist</div>
+                  <code style={{ fontSize: '12px', color: 'var(--text-primary)', display: 'block', background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                    {passport.frameworkFingerprint}
+                  </code>
+                </div>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Evidence Manifest Hash</div>
+                  <code style={{ fontSize: '12px', color: 'var(--text-primary)', display: 'block', background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '4px', border: '1px solid var(--border)', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+                    {passport.evidenceManifestHash}
+                  </code>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Claims List Table */}
+          <div className="glass-card" style={{ padding: '24px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, fontFamily: 'var(--font-display)', marginBottom: '16px' }}>
+              Attested Claims Check
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {testClaims.map((claim) => (
+                <div 
+                  key={claim.id}
+                  className="glass"
+                  onClick={() => setSelectedClaim(selectedClaim === claim.id ? null : claim.id)}
+                  style={{
+                    padding: '16px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: selectedClaim === claim.id ? 'rgba(255,255,255,0.02)' : 'transparent',
+                    borderColor: selectedClaim === claim.id ? 'var(--cyan)' : 'var(--border)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <CheckCircle size={18} color="#10b981" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500, flex: 1 }}>{claim.title}</span>
+                    <code style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{claim.evidenceRef}</code>
+                  </div>
+                  
+                  {selectedClaim === claim.id && (
+                    <div style={{ marginTop: '12px', paddingLeft: '30px', fontSize: '13px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border)', paddingTop: '12px', lineHeight: 1.5 }} className="animate-fade-in">
+                      {claim.description}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right Column: Score Ring and Orbit Map */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          
+          {/* Posture Score Radial Ring */}
+          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', alignSelf: 'flex-start', marginBottom: '12px' }}>
+              Assurance Posture Rating
+            </h4>
             <AssuranceRing 
               overallScore={passport.overallScore} 
               status={passport.status} 
-              assuranceLevel={passport.assuranceLevel.replace('_', ' ')} 
+              assuranceLevel={passport.assuranceLevel} 
             />
           </div>
 
-          {/* System Orbit Card */}
-          <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Server size={18} color="var(--primary)" />
-                Security Orbit Map
-              </h3>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Coverage and validation status of architecture components.
-              </p>
-            </div>
-            <SystemOrbit hasDrift={passport.hasDrift} heartbeatOffline={passport.isHeartbeatOffline} />
+          {/* Target Orbit System Telemetry Map */}
+          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+              System Orbit Status
+            </h4>
+            <SystemOrbit 
+              hasDrift={passport.hasDrift} 
+              heartbeatOffline={passport.isHeartbeatOffline} 
+            />
           </div>
 
-        </div>
-
-        {/* Right Side: Claims, Drift Telemetry, Exceptions */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* Passport Metadata Panel */}
-          <div className="glass" style={{ padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-            <div>
-              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Passport ID</span>
-              <p style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px', wordBreak: 'break-all' }} className="mono">{passport.passportId}</p>
-            </div>
-            <div>
-              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Assurance Level</span>
-              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary)', marginTop: '2px' }}>{passport.assuranceLevel.replace('_', ' ')}</p>
-            </div>
-            <div>
-              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Validity Period</span>
-              <p style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px' }}>
-                Until {new Date(passport.validUntil).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
-
-          {/* Active Security Claims */}
-          <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck size={18} color="#22c55e" />
-                Active Security Claims
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Security claims validated by Aegis Crucible. Click a claim to inspect linked evidence payloads.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {testClaims.map(c => {
-                const isOpen = selectedClaim === c.id;
-                return (
-                  <div 
-                    key={c.id}
-                    onClick={() => setSelectedClaim(isOpen ? null : c.id)}
-                    style={{
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-sm)',
-                      background: 'rgba(255,255,255,0.01)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                    }}
-                    className="hover-border"
-                  >
-                    <div style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 500 }}>{c.title}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }} className="mono">{c.evidenceRef}</span>
-                        <span style={{ 
-                          width: '8px', 
-                          height: '8px', 
-                          borderRadius: '50%', 
-                          background: '#22c55e', 
-                          boxShadow: '0 0 6px #22c55e'
-                        }} />
-                      </div>
-                    </div>
-
-                    {isOpen && (
-                      <div style={{ 
-                        padding: '12px', 
-                        borderTop: '1px solid var(--border)', 
-                        background: 'rgba(0,0,0,0.2)',
-                        fontSize: '12px',
-                        color: 'var(--text-secondary)',
-                        lineHeight: 1.5,
-                        animation: 'fadeIn 0.2s'
-                      }}>
-                        <p style={{ marginBottom: '8px' }}>{c.description}</p>
-                        <span style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                          View Raw Evidence Artifact <ExternalLink size={12} />
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Change Integrity & Drift Control */}
-          <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <History size={18} color="var(--primary)" />
-                Change Integrity & Telemetry
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Verifies configuration hashes of runtime elements against the cryptographically signed passport.
-              </p>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Tested Commit</span>
-                  <p style={{ fontSize: '13px', fontWeight: 500, marginTop: '2px' }} className="mono">{passport.gitCommit}</p>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Deployment Image Digest</span>
-                  <p style={{ fontSize: '12px', fontWeight: 500, marginTop: '2px', wordBreak: 'break-all' }} className="mono">
-                    {passport.deploymentDigest.substring(0, 36)}...
-                  </p>
-                </div>
-                <div>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Framework Fingerprint</span>
-                  <p style={{ fontSize: '13px', fontWeight: 500, marginTop: '2px' }} className="mono">{passport.frameworkFingerprint}</p>
-                </div>
-              </div>
-
-              <div style={{ 
-                borderLeft: '1px solid var(--border)', 
-                paddingLeft: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                gap: '8px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle size={16} color="#22c55e" />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#22c55e' }}>No Drift Detected</span>
-                </div>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                  System configuration matched passport fingerprints perfectly. Telemetry confirmed at: <span className="mono">{new Date(passport.lastDriftCheck).toLocaleTimeString()}</span>.
-                </p>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Exceptions Panel */}
-          <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertTriangle size={18} color="var(--caution)" />
-                Active Risk Exceptions
-              </h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Approved framework exceptions. A valid passport must display all risk exceptions transparently.
-              </p>
-            </div>
-
-            {exceptions.map(e => (
-              <div 
-                key={e.requirementId}
-                style={{
-                  border: '1px solid rgba(234, 179, 8, 0.2)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'rgba(234, 179, 8, 0.02)',
-                  padding: '16px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--caution)' }}>{e.requirementId} Exception</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Expires: <strong className="mono">{e.expiresAt}</strong></span>
-                </div>
-
-                <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '8px', color: 'var(--text-secondary)' }}>
-                  <p><strong>Justification:</strong> {e.justification}</p>
-                  <p><strong>Compensating Control:</strong> {e.compensatingControl}</p>
-                  <p><strong>Residual Risk:</strong> {e.residualRisk}</p>
-                </div>
-
-                <div style={{ borderTop: '1px solid rgba(234, 179, 8, 0.1)', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  <UserCheck size={14} color="var(--caution)" />
-                  Approved by {e.approvedBy}
-                </div>
-              </div>
-            ))}
+          {/* Share Embed Portal Link */}
+          <div className="glass-card" style={{ padding: '24px' }}>
+            <h4 style={{ fontSize: '14px', fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+              Embed Trust Seal
+            </h4>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.4 }}>
+              Copy the iframe embed code to display validation seals on your corporate trust site.
+            </p>
+            <button 
+              className="btn btn-ghost"
+              onClick={copyEmbedCode}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderStyle: 'dashed' }}
+            >
+              <Copy size={14} />
+              {copied ? 'Copied Embed Code!' : 'Copy Trust Embed'}
+            </button>
           </div>
 
         </div>
 
       </div>
 
-      <style jsx global>{`
-        .hover-border:hover {
-          border-color: var(--border-hover) !important;
-          background: rgba(255,255,255,0.03) !important;
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

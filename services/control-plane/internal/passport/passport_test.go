@@ -147,6 +147,12 @@ func TestEvaluationExceptionsIntegration(t *testing.T) {
 	// Pre-bootstrap mock data
 	_ = service.BootstrapMockData(ctx)
 
+	// Update telemetry heartbeat to current time to ensure runtime is online during the evaluation checks
+	_, err = db.Exec(ctx, "UPDATE control_evaluations SET last_evaluated_at = NOW() WHERE organization_id = $1 AND control_id = 'AegisAgent-heartbeat'", orgID)
+	if err != nil {
+		t.Fatalf("failed to update telemetry heartbeat: %v", err)
+	}
+
 	// Create a test snapshot
 	data := map[string]interface{}{"code_version": "v1"}
 	snap, err := service.CreateSnapshot(ctx, orgID, "agent_fin_advisor_01", data)

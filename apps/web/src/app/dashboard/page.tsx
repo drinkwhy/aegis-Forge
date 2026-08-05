@@ -1,39 +1,24 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { StatCard } from '@/components/ui/StatCard';
 import { SeverityBadge } from '@/components/ui/SeverityBadge';
-import dynamic from 'next/dynamic';
-
-const IntelligenceAnatomy3D = dynamic(
-  () => import('@/components/3d/IntelligenceAnatomy3D').then((m) => m.IntelligenceAnatomy3D),
-  { 
-    ssr: false, 
-    loading: () => (
-      <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
-        Loading 3D Anatomy Engine...
-      </div>
-    ) 
-  }
-);
 import { 
   Activity, 
   ShieldAlert, 
   Target, 
   TrendingUp, 
-  Inbox, 
   Play, 
   CheckCircle2, 
   ShieldCheck, 
-  Zap, 
-  Cpu, 
-  Lock, 
-  Layers, 
   Terminal, 
-  ArrowRight,
   Server,
-  Key
+  Layers,
+  Cpu,
+  ArrowRight,
+  Database
 } from 'lucide-react';
+import Link from 'next/link';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -68,17 +53,17 @@ const INITIAL_LOOP_STEPS: LoopStep[] = [
   { step: 3, title: 'Security Event Detection', service: 'Proxy Gateway', status: 'idle', detail: 'Honeyfact exfiltration detected in payload (Severity: CRITICAL)' },
   { step: 4, title: 'RoE Signature Verification', service: 'roe-validator', status: 'idle', detail: 'Cryptographic RoE signed — CFAA Safe Harbor Active' },
   { step: 5, title: 'gVisor Microcontainer Provisioning', service: 'sandbox-manager', status: 'idle', detail: 'Spawning isolated gVisor container (net-none, cap-drop)' },
-  { step: 6, title: 'Adversarial Payload Mutation', service: 'attack-generator', serviceName: 'Claude 3.5', status: 'idle', detail: 'Synthesizing mutated system prompt override attack vector' },
-  { step: 7, title: 'Canary Verification & Evaluation', service: 'evaluator-agent', serviceName: 'GPT-4o', status: 'idle', detail: 'HMAC signature confirmed; GPT-4o confidence 0.98 (Breach Confirmed)' },
+  { step: 6, title: 'Adversarial Payload Mutation', service: 'attack-generator', status: 'idle', detail: 'Synthesizing mutated system prompt override attack vector' },
+  { step: 7, title: 'Canary Verification & Evaluation', service: 'evaluator-agent', status: 'idle', detail: 'HMAC signature confirmed; GPT-4o confidence 0.98 (Breach Confirmed)' },
   { step: 8, title: 'FAIR-AI Risk Scoring & Graphing', service: 'analysis-engine', status: 'idle', detail: 'Calculated FAIR Risk Score: 8.9/10.0; Neo4j attack path mapped' },
   { step: 9, title: 'Defensive Sentinel Policy Synthesis', service: 'remediation-agent', status: 'idle', detail: 'Drafting Sentinel policy: FSM transition DRAFT → VALIDATED → STAGED' },
   { step: 10, title: 'Runtime Gateway Active Enforcement', service: 'Control Plane', status: 'idle', detail: 'Sentinel deployed to gateway: Repeat attack vector 100% BLOCKED' },
   { step: 11, title: 'Attack Corpus Compounding', service: 'attack-corpus', status: 'idle', detail: 'Regression entry mcp-hf-001 appended to permanent build-gate' }
-] as any[];
+];
 
 export default function DashboardPage() {
-  const { data: findingsData, error: findingsErr } = useSWR('/api/v1/findings', fetcher);
-  const { data: campaignsData, error: campaignsErr } = useSWR('/api/v1/campaigns', fetcher);
+  const { data: findingsData, mutate: mutateFindings } = useSWR('/api/v1/findings', fetcher);
+  const { data: campaignsData } = useSWR('/api/v1/campaigns', fetcher);
 
   const findings: Finding[] = findingsData?.findings || [];
   const campaigns: Campaign[] = campaignsData?.campaigns || [];
@@ -88,7 +73,15 @@ export default function DashboardPage() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [activeStepIndex, setActiveStepIndex] = useState<number | null>(null);
   const [simulationComplete, setSimulationComplete] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'anatomy' | 'simulator'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'simulation'>('overview');
+
+  const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeStepIndex]);
 
   const runHardeningSimulation = () => {
     setIsSimulating(true);
@@ -99,157 +92,341 @@ export default function DashboardPage() {
 
     let currentStep = 0;
     const interval = setInterval(() => {
-      if (currentStep < INITIAL_LOOP_STEPS.length) {
-        setActiveStepIndex(currentStep);
-        setLoopSteps(prev => prev.map((s, idx) => {
-          if (idx < currentStep) return { ...s, status: 'complete' };
-          if (idx === currentStep) return { ...s, status: 'running' };
-          return { ...s, status: 'idle' };
-        }));
-        currentStep++;
-      } else {
+      setLoopSteps(prev => {
+        const nextSteps = prev.map((s, idx) => {
+          if (idx === currentStep) return { ...s, status: 'running' as const };
+          if (idx < currentStep) return { ...s, status: 'complete' as const };
+          return s;
+        });
+        return nextSteps;
+      });
+
+      setActiveStepIndex(currentStep);
+      currentStep++;
+
+      if (currentStep >= INITIAL_LOOP_STEPS.length) {
         clearInterval(interval);
-        setLoopSteps(prev => prev.map(s => ({ ...s, status: 'complete' })));
+        setLoopSteps(prev => prev.map(s => ({ ...s, status: 'complete' as const })));
         setIsSimulating(false);
         setSimulationComplete(true);
-        setActiveStepIndex(null);
+        mutateFindings(); // Refresh findings table
       }
-    }, 900);
+    }, 1500);
   };
 
-  const activeCampaigns = campaigns.filter(c => c.status.toLowerCase() === 'running').length;
-  const criticalFindings = findings.filter(f => f.severity.toLowerCase() === 'critical').length;
-  const totalAgents = findings.reduce((acc, curr) => {
-    if (curr.agentName && !acc.includes(curr.agentName)) acc.push(curr.agentName);
-    return acc;
-  }, [] as string[]).length || 4;
+  // Determine active canvas nodes based on current simulation step
+  const getCanvasHighlight = () => {
+    if (!isSimulating || activeStepIndex === null) return { agent: false, gateway: false, sandbox: false, db: false };
+    const step = activeStepIndex + 1;
+    return {
+      agent: step >= 1 && step <= 2 || step === 6,
+      gateway: step === 3 || step === 4 || step === 10,
+      sandbox: step >= 5 && step <= 9 || step === 11,
+      db: step === 2 || step === 7
+    };
+  };
 
-  const stats = [
-    { title: 'Agents Monitored', value: String(totalAgents), change: '100% Protected', changeType: 'up' as const, icon: Target },
-    { title: 'Active Sandboxes', value: String(isSimulating ? activeCampaigns + 1 : activeCampaigns || 1), change: 'gVisor Isolated', changeType: 'up' as const, icon: Server },
-    { title: 'Open Critical Breaches', value: simulationComplete ? '0 (Hardened)' : String(criticalFindings || 1), change: simulationComplete ? 'Resolved' : 'Requires Action', changeType: simulationComplete ? ('up' as const) : ('down' as const), icon: ShieldAlert },
-    { title: 'Avg FAIR-AI Risk Score', value: simulationComplete ? '0.1 (LOW)' : '8.9 (CRITICAL)', change: simulationComplete ? 'Post-Hardened' : 'Unmanaged', changeType: simulationComplete ? ('up' as const) : ('down' as const), icon: TrendingUp },
-  ];
+  const canvasHighlight = getCanvasHighlight();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-      {/* Header Banner */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+      
+      {/* Top Header Section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <h1 style={{ fontSize: '26px', fontWeight: 700 }} className="gradient-text">
-              Aegis Forge Continuous AI Hardening Platform
-            </h1>
-            <span className="badge badge-info">v1.2 Production MVP</span>
-          </div>
+          <h2 style={{ fontSize: '32px', fontWeight: 800, fontFamily: 'var(--font-display)', letterSpacing: '-0.02em', marginBottom: '4px' }}>
+            Operations Control Deck
+          </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Self-improving AI security validation engine for autonomous agents, MCP servers, and enterprise tools.
+            Real-time continuous hardening diagnostics, telemetry, and vulnerability logs.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="glass" style={{ display: 'flex', padding: '4px', borderRadius: 'var(--radius-sm)' }}>
           <button 
-            className={`btn ${activeTab === 'overview' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => setActiveTab('overview')}
-          >
-            Overview
-          </button>
-          <button 
-            className={`btn ${activeTab === 'anatomy' ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setActiveTab('anatomy')}
-          >
-            3D Living Anatomy
-          </button>
-          <button 
-            className="btn btn-primary"
-            disabled={isSimulating}
-            onClick={runHardeningSimulation}
-            style={{ 
-              background: isSimulating ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%)',
-              color: '#ffffff',
-              boxShadow: isSimulating ? 'none' : '0 0 20px rgba(0, 212, 255, 0.4)',
-              cursor: isSimulating ? 'not-allowed' : 'pointer'
+            style={{
+              padding: '6px 16px',
+              fontSize: '13px',
+              fontWeight: 600,
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              background: activeTab === 'overview' ? 'var(--cyan)' : 'transparent',
+              color: activeTab === 'overview' ? '#050814' : 'var(--text-secondary)',
+              transition: 'all 0.2s'
             }}
           >
-            <Play size={16} fill="currentColor" />
-            {isSimulating ? 'Simulating Hardening Loop...' : 'Trigger Live Hardening Loop'}
+            HUD Overview
+          </button>
+          <button 
+            onClick={() => setActiveTab('simulation')}
+            style={{
+              padding: '6px 16px',
+              fontSize: '13px',
+              fontWeight: 600,
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              background: activeTab === 'simulation' ? 'var(--cyan)' : 'transparent',
+              color: activeTab === 'simulation' ? '#050814' : 'var(--text-secondary)',
+              transition: 'all 0.2s'
+            }}
+          >
+            Hardening Simulator
           </button>
         </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* Main Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
-        {stats.map(s => <StatCard key={s.title} {...s} />)}
+        <StatCard title="Validation Pass Rate" value="100%" change="+0.0%" icon={ShieldCheck} />
+        <StatCard title="Active Vulnerabilities" value={String(findings.length)} change="-1 this week" icon={ShieldAlert} />
+        <StatCard title="Hardening Campaigns" value={String(campaigns.length)} change="Continuous" icon={Target} />
+        <StatCard title="Gateway Checks/Min" value="1,842" change="+12%" icon={Activity} />
       </div>
 
-      {/* Main Tab Views */}
-      {activeTab === 'anatomy' ? (
-        <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 600 }}>3D WebGL Living Intelligence Human Anatomy</h3>
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Click nodes to inspect organ systems</span>
-          </div>
-          <IntelligenceAnatomy3D />
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-          {/* Left Column: Live Hardening Loop Interactive Simulator */}
-          <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Zap size={20} color="var(--primary)" />
-                <h3 style={{ fontSize: '17px', fontWeight: 600 }}>Continuous Security Improvement Loop</h3>
+      {activeTab === 'overview' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '32px' }}>
+          
+          {/* Left Grid: Interactive Threat Canvas & Tables */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            
+            {/* Interactive Threat Canvas Card */}
+            <div className="glass-card glow-cyan" style={{ padding: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '16px' }}>
+                Threat Interaction Canvas
+              </h3>
+              
+              <div style={{ display: 'flex', justifyContent: 'center', background: '#040713', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '24px 0' }}>
+                <svg width="550" height="220" viewBox="0 0 550 220" style={{ overflow: 'visible' }}>
+                  <defs>
+                    <linearGradient id="cyan-primary" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="var(--cyan)" />
+                      <stop offset="100%" stopColor="var(--primary)" />
+                    </linearGradient>
+                  </defs>
+
+                  {/* Connective Paths */}
+                  <path d="M 100,110 L 250,50" stroke={canvasHighlight.gateway ? 'var(--cyan)' : 'var(--border)'} strokeWidth={canvasHighlight.gateway ? '3' : '1.5'} strokeDasharray={canvasHighlight.gateway ? "5, 5" : "none"} fill="none" style={{ transition: 'all 0.3s' }} />
+                  <path d="M 100,110 L 250,170" stroke={canvasHighlight.sandbox ? 'var(--cyan)' : 'var(--border)'} strokeWidth={canvasHighlight.sandbox ? '3' : '1.5'} strokeDasharray={canvasHighlight.sandbox ? "5, 5" : "none"} fill="none" style={{ transition: 'all 0.3s' }} />
+                  <path d="M 250,50 L 450,110" stroke={canvasHighlight.gateway ? 'var(--cyan)' : 'var(--border)'} strokeWidth={canvasHighlight.gateway ? '3' : '1.5'} fill="none" style={{ transition: 'all 0.3s' }} />
+                  <path d="M 250,170 L 450,110" stroke={canvasHighlight.sandbox ? 'var(--cyan)' : 'var(--border)'} strokeWidth={canvasHighlight.sandbox ? '3' : '1.5'} fill="none" style={{ transition: 'all 0.3s' }} />
+
+                  {/* Node 1: AI Agent */}
+                  <circle cx="100" cy="110" r="30" fill="#0b1126" stroke={canvasHighlight.agent ? 'var(--cyan)' : 'var(--primary)'} strokeWidth="2.5" style={{ transition: 'all 0.3s', filter: canvasHighlight.agent ? 'drop-shadow(0 0 10px var(--cyan))' : 'none' }} />
+                  <foreignObject x="80" y="95" width="40" height="30">
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      <Cpu size={18} color={canvasHighlight.agent ? 'var(--cyan)' : 'var(--text-secondary)'} />
+                    </div>
+                  </foreignObject>
+                  <text x="100" y="160" textAnchor="middle" fill="var(--text-secondary)" fontSize="11" fontWeight="600" fontFamily="var(--font-display)">AI Agent Runtime</text>
+
+                  {/* Node 2: Proxy Gateway */}
+                  <circle cx="250" cy="50" r="30" fill="#0b1126" stroke={canvasHighlight.gateway ? 'var(--cyan)' : 'var(--border)'} strokeWidth="2.5" style={{ transition: 'all 0.3s', filter: canvasHighlight.gateway ? 'drop-shadow(0 0 10px var(--cyan))' : 'none' }} />
+                  <foreignObject x="230" y="35" width="40" height="30">
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      <Layers size={18} color={canvasHighlight.gateway ? 'var(--cyan)' : 'var(--text-secondary)'} />
+                    </div>
+                  </foreignObject>
+                  <text x="250" y="10" textAnchor="middle" fill="var(--text-secondary)" fontSize="11" fontWeight="600" fontFamily="var(--font-display)">Proxy Gateway</text>
+
+                  {/* Node 3: gVisor Sandbox */}
+                  <circle cx="250" cy="170" r="30" fill="#0b1126" stroke={canvasHighlight.sandbox ? 'var(--cyan)' : 'var(--border)'} strokeWidth="2.5" style={{ transition: 'all 0.3s', filter: canvasHighlight.sandbox ? 'drop-shadow(0 0 10px var(--cyan))' : 'none' }} />
+                  <foreignObject x="230" y="155" width="40" height="30">
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      <Server size={18} color={canvasHighlight.sandbox ? 'var(--cyan)' : 'var(--text-secondary)'} />
+                    </div>
+                  </foreignObject>
+                  <text x="250" y="215" textAnchor="middle" fill="var(--text-secondary)" fontSize="11" fontWeight="600" fontFamily="var(--font-display)">gVisor Sandbox</text>
+
+                  {/* Node 4: Database */}
+                  <circle cx="450" cy="110" r="30" fill="#0b1126" stroke={canvasHighlight.db ? 'var(--cyan)' : 'var(--primary)'} strokeWidth="2.5" style={{ transition: 'all 0.3s', filter: canvasHighlight.db ? 'drop-shadow(0 0 10px var(--cyan))' : 'none' }} />
+                  <foreignObject x="430" y="95" width="40" height="30">
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                      <Database size={18} color={canvasHighlight.db ? 'var(--cyan)' : 'var(--text-secondary)'} />
+                    </div>
+                  </foreignObject>
+                  <text x="450" y="160" textAnchor="middle" fill="var(--text-secondary)" fontSize="11" fontWeight="600" fontFamily="var(--font-display)">Acme Database</text>
+                </svg>
               </div>
-              <span className={`badge ${simulationComplete ? 'badge-low' : isSimulating ? 'badge-info' : 'badge-medium'}`}>
-                {simulationComplete ? '100% Hardened' : isSimulating ? 'Running Loop' : 'Ready'}
-              </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '520px', overflowY: 'auto', paddingRight: '4px' }}>
+            {/* Live Open Vulnerabilities Table */}
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)' }}>
+                  Active Security Findings
+                </h3>
+                <Link href="/dashboard/findings" style={{ fontSize: '13px', color: 'var(--cyan)', display: 'flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
+                  View All Findings <ArrowRight size={14} />
+                </Link>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {findings.length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                    No active security findings. Platform is clean.
+                  </div>
+                ) : (
+                  findings.map((f) => (
+                    <Link 
+                      key={f.id}
+                      href={`/dashboard/findings/${f.id}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '14px 18px',
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'rgba(255,255,255,0.01)',
+                        border: '1px solid var(--border)',
+                        textDecoration: 'none',
+                        color: 'var(--text-primary)',
+                        transition: 'all 0.2s'
+                      }}
+                      className="glass"
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: 600 }}>{f.title}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Agent: {f.agentName || 'Wealthfront Agent'}</span>
+                      </div>
+                      <SeverityBadge severity={f.severity} />
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Right Grid: Hardening Campaigns */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '16px' }}>
+                Active Campaigns
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {campaigns.length === 0 ? (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center' }}>
+                    No campaigns running.
+                  </div>
+                ) : (
+                  campaigns.map((c) => (
+                    <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600 }}>{c.name}</span>
+                        <span style={{ 
+                          fontSize: '10px', 
+                          background: c.status === 'RUNNING' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(16, 185, 129, 0.1)', 
+                          color: c.status === 'RUNNING' ? 'var(--cyan)' : 'var(--success)', 
+                          padding: '2px 8px', 
+                          borderRadius: '4px',
+                          fontWeight: 700
+                        }} className="mono">
+                          {c.status}
+                        </span>
+                      </div>
+                      
+                      {/* Custom Progress Bar */}
+                      <div style={{ height: '6px', background: 'var(--bg-surface)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ 
+                          width: `${(c.tests_run / c.total_tests) * 100}%`, 
+                          height: '100%', 
+                          background: 'linear-gradient(90deg, var(--cyan), var(--primary))',
+                          borderRadius: '3px'
+                        }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
+                        <span>Progress: {c.tests_run}/{c.total_tests} Runs</span>
+                        <span>{Math.round((c.tests_run / c.total_tests) * 100)}%</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Quick Simulation Trigger */}
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-display)', marginBottom: '8px' }}>
+                Trigger Diagnostics
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.4 }}>
+                Simulate a complete prompt injection and microcontainer sandboxing bypass scenario.
+              </p>
+              <button 
+                className="btn btn-primary"
+                onClick={() => {
+                  setActiveTab('simulation');
+                  runHardeningSimulation();
+                }}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                <Play size={14} fill="#050814" /> Run Hardening Simulator
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      ) : (
+        /* Hardening Simulator console Tab */
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '32px' }} className="animate-fade-in">
+          
+          {/* Left panel: Simulator step list */}
+          <div className="glass-card" style={{ padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-display)' }}>
+                Adversarial Hardening Pipeline
+              </h3>
+              <button 
+                className="btn btn-primary"
+                onClick={runHardeningSimulation}
+                disabled={isSimulating}
+              >
+                <Play size={12} fill="#050814" /> {isSimulating ? 'Simulating Run...' : 'Start Simulator'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
+              <div style={{ position: 'absolute', left: '15px', top: '24px', bottom: '24px', width: '2px', background: 'var(--border)' }} />
+              
               {loopSteps.map((step, idx) => {
-                const isActive = activeStepIndex === idx;
+                const isCurrent = activeStepIndex === idx;
+                const isComplete = step.status === 'complete';
+                
                 return (
-                  <div 
-                    key={step.step}
-                    style={{
-                      padding: '12px 16px',
-                      borderRadius: 'var(--radius-sm)',
-                      background: isActive ? 'var(--primary-dim)' : step.status === 'complete' ? 'rgba(34, 197, 94, 0.08)' : 'var(--bg-elevated)',
-                      border: isActive ? '1px solid var(--primary)' : step.status === 'complete' ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid var(--border)',
-                      transition: 'all 0.25s ease',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '14px'
-                    }}
-                  >
-                    <div style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '50%',
-                      background: step.status === 'complete' ? 'var(--success)' : isActive ? 'var(--primary)' : 'var(--bg-base)',
-                      color: step.status === 'complete' || isActive ? '#020817' : 'var(--text-muted)',
+                  <div key={step.step} style={{ display: 'flex', gap: '20px', opacity: isCurrent || isComplete ? 1 : 0.4, transition: 'all 0.3s' }}>
+                    <div style={{ 
+                      width: '32px', 
+                      height: '32px', 
+                      borderRadius: '50%', 
+                      background: isCurrent ? 'var(--cyan)' : isComplete ? 'var(--success)' : 'var(--bg-surface)', 
+                      border: '1px solid var(--border)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontWeight: 700,
                       fontSize: '12px',
-                      flexShrink: 0
+                      fontWeight: 700,
+                      color: isCurrent ? '#050814' : isComplete ? '#050814' : 'var(--text-secondary)',
+                      flexShrink: 0,
+                      position: 'relative',
+                      zIndex: 1
                     }}>
-                      {step.status === 'complete' ? <CheckCircle2 size={16} /> : step.step}
+                      {step.step}
                     </div>
-
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 600, color: isActive ? 'var(--primary)' : 'var(--text-primary)' }}>
-                          {step.title}
-                        </div>
-                        <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
-                          {step.service}
-                        </span>
+                    
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h4 style={{ fontSize: '15px', fontWeight: 600 }}>{step.title}</h4>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>[{step.service}]</span>
                       </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.4 }}>
                         {step.detail}
-                      </div>
+                      </p>
                     </div>
                   </div>
                 );
@@ -257,77 +434,59 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Right Column: Dynamic System Telemetry & gVisor Sandbox Status */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* gVisor Container Sandbox Card */}
-            <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Server size={20} color="var(--primary)" />
-                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>gVisor Container Sandbox</h3>
-                </div>
-                <span className="badge badge-info">runsc v1.26</span>
-              </div>
-
-              <div style={{ background: 'var(--bg-base)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span>CONTAINER ID</span>
-                  <span>ISOLATION FLAGS</span>
-                  <span>STATUS</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-primary)' }}>
-                  <span style={{ color: 'var(--primary)' }}>sbx_gvisor_7710</span>
-                  <span>--network none --cap-drop ALL</span>
-                  <span style={{ color: isSimulating ? 'var(--primary)' : 'var(--success)' }}>
-                    {isSimulating ? 'EXECUTING ATTACK' : 'CONTAINED'}
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div style={{ background: 'var(--bg-elevated)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>HMAC CANARY SIGNATURE</div>
-                  <div style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--primary)' }}>2bf8cf57a99cb448</div>
-                </div>
-                <div style={{ background: 'var(--bg-elevated)', padding: '12px', borderRadius: 'var(--radius-sm)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>GPT-4O CONFIDENCE</div>
-                  <div style={{ fontSize: '13px', fontFamily: 'monospace', color: 'var(--success)' }}>0.98 (BREACH CONFIRMED)</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Active Sentinel Policy Card */}
-            <div className="glass" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <ShieldCheck size={20} color="var(--success)" />
-                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Active Sentinel Policy</h3>
-                </div>
-                <span className={`badge ${simulationComplete ? 'badge-low' : 'badge-medium'}`}>
-                  {simulationComplete ? 'ACTIVE ENFORCING' : 'STAGED'}
+          {/* Right panel: Terminal execution read-out */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            
+            {/* Terminal Window Card */}
+            <div className="glass-card" style={{ padding: '24px', background: '#040713', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '16px' }}>
+                <Terminal size={14} color="var(--cyan)" />
+                <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--text-secondary)' }}>
+                  HARDENING STACK TERMINAL
                 </span>
               </div>
 
-              <div style={{ background: 'var(--bg-base)', padding: '16px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Policy ID:</span>
-                  <span style={{ fontFamily: 'monospace', color: 'var(--primary)' }}>sentinel_dlp_honeyfact_guard_01</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Lifecycle FSM:</span>
-                  <span style={{ fontWeight: 600, color: 'var(--success)' }}>
-                    DRAFT → SIMULATING → VALIDATED → STAGED → ACTIVE
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Differential Protection:</span>
-                  <span>100% Repeat Attack Blocked</span>
-                </div>
+              <div style={{ 
+                flex: 1, 
+                fontFamily: 'var(--font-mono)', 
+                fontSize: '12px', 
+                color: 'var(--text-secondary)', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '8px',
+                overflowY: 'auto',
+                maxHeight: '400px'
+              }}>
+                <div>[SYSTEM] Onboarding diagnostic terminal online.</div>
+                {loopSteps.slice(0, activeStepIndex !== null ? activeStepIndex + 1 : 0).map((step, idx) => (
+                  <div key={idx} style={{ lineHeight: 1.5 }}>
+                    <span style={{ color: 'var(--cyan)' }}>[{step.service.toUpperCase()}]</span> {step.detail}
+                  </div>
+                ))}
+                {simulationComplete && (
+                  <div style={{ color: 'var(--success)', marginTop: '12px', fontWeight: 600 }}>
+                    [EVALUATOR] Simulation run complete. Vulnerability ingested. Defensive Sentinel policy deployed and verified.
+                  </div>
+                )}
+                <div ref={terminalEndRef} />
               </div>
             </div>
+
+            {/* Interaction Diagram Card */}
+            <div className="glass-card" style={{ padding: '24px' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 600, fontFamily: 'var(--font-display)', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                Interaction Trace highlights
+              </h4>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                As steps run, notice how data routes change. Standard tool calls go to the **Proxy Gateway**, while mutated red-team payloads are spun up in the isolated **gVisor Sandbox** to prevent escape.
+              </p>
+            </div>
+
           </div>
+
         </div>
       )}
+
     </div>
   );
 }

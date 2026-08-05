@@ -4,11 +4,11 @@ import { dark } from '@clerk/themes'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Aegis Forge — Continuous AI Security Validation',
+  title: 'Aegis Crucible — Continuous AI Security Validation',
   description: 'Automated adversarial simulation and continuous hardening for AI agents. Prove your defenses hold.',
   keywords: 'AI security, red teaming, MCP security, prompt injection testing, LLM security',
   openGraph: {
-    title: 'Aegis Forge',
+    title: 'Aegis Crucible',
     description: 'Continuous AI Security Validation Platform',
     type: 'website',
   }

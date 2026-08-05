@@ -20,7 +20,7 @@ export default function Home() {
       fontSize: '14px',
       fontWeight: 500
     }}>
-      Redirecting to Aegis Forge Platform Dashboard...
+      Redirecting to Aegis Crucible Platform Dashboard...
     </div>
   );
 }

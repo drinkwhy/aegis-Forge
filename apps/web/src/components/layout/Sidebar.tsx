@@ -8,12 +8,14 @@ import {
   Network, 
   Wrench, 
   FileText, 
-  Settings 
+  Settings,
+  ShieldCheck
 } from 'lucide-react';
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: '3D Anatomy', href: '/dashboard/anatomy', icon: Activity },
+  { name: 'Security Passport', href: '/dashboard/passport', icon: ShieldCheck },
   { name: 'Campaigns', href: '/dashboard/campaigns', icon: Play },
   { name: 'Findings', href: '/dashboard/findings', icon: ShieldAlert },
   { name: 'Assets', href: '/dashboard/assets', icon: Network },

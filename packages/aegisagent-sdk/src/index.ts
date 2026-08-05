@@ -335,6 +335,30 @@ export class AegisClient {
       headers: execution.headers,
     });
   }
+
+  /** Sends a manual or scheduled telemetry heartbeat to register the runtime control status. */
+  async sendHeartbeat(organizationId: string, systemId: string): Promise<void> {
+    const response = await this.fetchImpl(`${this.baseUrl}/api/v1/organizations/${encodeURIComponent(organizationId)}/systems/${encodeURIComponent(systemId)}/heartbeat`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`AegisAgent heartbeat ping failed: ${response.status} ${response.statusText}`);
+    }
+  }
+
+  /** Starts a background telemetry interval sending heartbeats to the control plane. */
+  startHeartbeatLoop(organizationId: string, systemId: string, intervalMs = 60000): NodeJS.Timeout {
+    // Send immediate heartbeat on start
+    this.sendHeartbeat(organizationId, systemId).catch(() => {});
+    return setInterval(() => {
+      this.sendHeartbeat(organizationId, systemId).catch(() => {});
+    }, intervalMs);
+  }
 }
 
 export function createAegisAgent(options: AegisClientOptions): AegisClient {

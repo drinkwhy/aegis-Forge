@@ -1,0 +1,9 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+catalog:
+  '@tanstack/react-query': '^5.0.0'
+  '@types/node': '^20.0.0'
+  'drizzle-orm': '^0.39.0'
+  'zod': '^3.24.0'

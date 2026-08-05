@@ -7,7 +7,9 @@
   --border: #242f41; /* Flat, high-contrast border line */
   --border-hover: #3b82f6; /* Highlight border on hover */
   --primary: #3b82f6; /* Trusted Cobalt Blue */
+  --primary-dim: rgba(59, 130, 246, 0.08); /* Subtle primary tint for active states */
   --accent: #eab308; /* Norton-style Golden Shield Yellow */
+  --cyan: #06b6d4; /* Teal accent for highlight elements */
   --danger: #ef4444; /* Alert Red */
   --success: #10b981; /* Verified Success Green */
   --text-primary: #f9fafb;
@@ -18,6 +20,8 @@
   --radius-lg: 12px;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; /* Display/heading font */
+  --glass-bg: rgba(18, 24, 36, 0.85); /* Frosted glass background for overlays */
 }
 
 *, *::before, *::after { 
@@ -200,4 +204,52 @@ code, .mono {
 }
 .animate-fade-in { 
   animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+}
+
+/* Glow effects */
+.glow-cyan {
+  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.15), 0 4px 24px rgba(6, 182, 212, 0.08);
+}
+.glow-ruby {
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2), 0 4px 24px rgba(239, 68, 68, 0.1);
+}
+
+/* Radar pulse animation (sidebar status indicator) */
+@keyframes radarPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.radar-pulse {
+  animation: radarPulse 2s ease-out infinite;
+}
+
+/* Spin animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Pulse animation for skeleton loading */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Step progress indicator */
+.step-connector {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  margin: 0 8px;
+  transition: background 0.3s ease;
+}
+.step-connector.active {
+  background: var(--primary);
 }

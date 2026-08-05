@@ -457,7 +457,7 @@ export default function DashboardPage() {
                 overflowY: 'auto',
                 maxHeight: '400px'
               }}>
-                <div>[SYSTEM] Onboarding diagnostic terminal online.</div>
+                <div>[SYSTEM] Hardening diagnostic terminal online.</div>
                 {loopSteps.slice(0, activeStepIndex !== null ? activeStepIndex + 1 : 0).map((step, idx) => (
                   <div key={idx} style={{ lineHeight: 1.5 }}>
                     <span style={{ color: 'var(--cyan)' }}>[{step.service.toUpperCase()}]</span> {step.detail}

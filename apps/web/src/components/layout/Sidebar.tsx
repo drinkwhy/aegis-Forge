@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import { 
   LayoutDashboard, 
   Activity,
@@ -12,10 +13,15 @@ import {
   ShieldCheck,
   CreditCard,
   Zap,
+  Cpu,
+  BarChart3,
+  Shield,
 } from 'lucide-react';
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'AI Trust Registry', href: '/dashboard/systems', icon: Cpu },
+  { name: 'Trust Dashboard', href: '/dashboard/trust', icon: BarChart3 },
   { name: '3D Anatomy', href: '/dashboard/anatomy', icon: Activity },
   { name: 'Security Passport', href: '/dashboard/passport', icon: ShieldCheck },
   { name: 'Campaigns', href: '/dashboard/campaigns', icon: Play },
@@ -27,9 +33,12 @@ const navItems = [
 ];
 
 const billingItem = { name: 'Billing', href: '/dashboard/billing', icon: CreditCard };
+const adminItem = { name: 'Admin Console', href: '/admin', icon: Shield };
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user } = useUser();
+  const isAdmin = user?.publicMetadata?.role === 'admin' || user?.publicMetadata?.role === 'superadmin';
 
   const navLinkStyle = (isActive: boolean) => ({
     display: 'flex',
@@ -84,6 +93,19 @@ export function Sidebar() {
               {billingItem.name}
             </Link>
           </li>
+
+          {/* Admin Console — visible only for admins */}
+          {isAdmin && (
+            <li>
+              <Link
+                href={adminItem.href}
+                style={{ ...navLinkStyle(pathname.startsWith(adminItem.href)), borderColor: pathname.startsWith(adminItem.href) ? '#ef4444' : 'transparent', color: pathname.startsWith(adminItem.href) ? '#ef4444' : 'var(--text-muted)', background: pathname.startsWith(adminItem.href) ? 'rgba(239,68,68,0.08)' : 'transparent' }}
+              >
+                <adminItem.icon size={16} color={pathname.startsWith(adminItem.href) ? '#ef4444' : '#6b7280'} />
+                {adminItem.name}
+              </Link>
+            </li>
+          )}
         </ul>
       </nav>
 

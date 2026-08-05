@@ -27,6 +27,7 @@ const nextConfig = {
         destination: `${controlPlaneOrigin}/api/v1/workspaces/${workspaceId}/remediations`,
       },
       {
+        // Catch-all — proxies all /api/v1/* directly to control-plane
         source: '/api/v1/:path*',
         destination: `${controlPlaneOrigin}/api/v1/:path*`,
       },

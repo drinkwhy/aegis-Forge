@@ -128,6 +128,19 @@ func (s *Server) setupRoutes() {
 			r.Post("/security-passports/{passportId}/revoke", s.passportHandler.RevokePassport)
 			r.Post("/security-passports/{passportId}/suspend", s.passportHandler.SuspendPassport)
 			r.Post("/security-passports/{passportId}/supersede", s.passportHandler.SupersedePassport)
+
+			// AI System Registry
+			r.Get("/systems", s.listAISystems)
+			r.Post("/systems", s.createAISystem)
+			r.Get("/systems/{systemId}", s.getAISystem)
+			r.Patch("/systems/{systemId}", s.updateAISystem)
+
+			// Runtime Events
+			r.Post("/systems/{systemId}/events", s.ingestRuntimeEvent)
+			r.Get("/systems/{systemId}/events", s.listRuntimeEvents)
+
+			// Trust Summary (executive dashboard)
+			r.Get("/trust-summary", s.getTrustSummary)
 		})
 
 		r.Route("/workspaces", func(r chi.Router) {

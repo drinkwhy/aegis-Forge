@@ -39,9 +39,17 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		_, _ = pool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ('002_security_passport.sql') ON CONFLICT DO NOTHING")
 	}
 
+	// If 'ai_systems' table already exists, pre-seed 003_ai_systems.sql
+	var aiSystemsExists bool
+	_ = pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ai_systems')").Scan(&aiSystemsExists)
+	if aiSystemsExists {
+		_, _ = pool.Exec(ctx, "INSERT INTO schema_migrations (version) VALUES ('003_ai_systems.sql') ON CONFLICT DO NOTHING")
+	}
+
 	files := []string{
 		"001_initial_schema.sql",
 		"002_security_passport.sql",
+		"003_ai_systems.sql",
 	}
 
 	for _, file := range files {

@@ -42,52 +42,6 @@ export default function PassportPage() {
   const passportList = passportsData || [];
   const activePassport = passportList[0];
 
-  const passport = activePassport ? {
-    passportId: activePassport.passportId,
-    passportVersion: activePassport.passportVersion,
-    systemDisplayName: activePassport.systemDisplayName,
-    status: activePassport.status,
-    assuranceLevel: activePassport.assuranceLevel,
-    overallScore: activePassport.overallScore,
-    issuedAt: activePassport.issuedAt,
-    validUntil: activePassport.validUntil,
-    frameworkVersionId: activePassport.frameworkVersionId,
-    frameworkFingerprint: activePassport.frameworkFingerprint,
-    subjectFingerprint: activePassport.subjectFingerprint,
-    evidenceManifestHash: activePassport.evidenceManifestHash,
-    gitCommit: activePassport.subjectFingerprint.slice(0, 12),
-    deploymentDigest: 'sha256:' + activePassport.subjectFingerprint.slice(0, 24),
-    lastDriftCheck: new Date(activePassport.issuedAt).toLocaleString(),
-    hasDrift: activePassport.status === 'REVOKED' || activePassport.overallScore < 0.85,
-    isHeartbeatOffline: activePassport.overallScore < 0.50,
-  } : {
-    passportId: 'pass_01JA98BD192X0192A',
-    passportVersion: '1.0',
-    systemDisplayName: 'Enterprise Financial Portfolio Advisor',
-    status: 'VALID',
-    assuranceLevel: 'CONTINUOUSLY_VERIFIED',
-    overallScore: 0.94,
-    issuedAt: '2026-07-26T12:00:00Z',
-    validUntil: '2027-07-26T12:00:00Z',
-    frameworkVersionId: 'fw-v1.4.2-finance',
-    frameworkFingerprint: 'fw_8fa21c4de8e441c9',
-    subjectFingerprint: '8fa21c4de8e441c9902ba98e102f4cc889f8162e848de1d9ff02bc4500ea1e84',
-    evidenceManifestHash: 'manifest_8fa21c4de8e4',
-    gitCommit: '4dd69883e0f4',
-    deploymentDigest: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    lastDriftCheck: '2026-08-05T01:10:00-05:00',
-    hasDrift: false,
-    isHeartbeatOffline: false,
-  };
-
-  const testClaims: TestClaim[] = [
-    { id: '1', title: 'Prompt Injection Resistance', status: 'passed', evidenceRef: 'ev_pi_01', description: 'Differential validation executed against 150 prompt injection attack matrices; zero successful system prompt overwrites recorded.' },
-    { id: '2', title: 'Unauthorized Tool Execution Block', status: 'passed', evidenceRef: 'ev_ut_02', description: 'SQL tool query intercepter verified. Out-of-bounds parameter modification blocked by active Sentinel filters.' },
-    { id: '3', title: 'Sensitive Data Exfiltration Prevention', status: 'passed', evidenceRef: 'ev_de_03', description: 'Audit logs confirm egress proxy intercepted and masked all outbound requests containing mock sensitive credentials.' },
-    { id: '4', title: 'MCP Sandbox Integrity', status: 'passed', evidenceRef: 'ev_mcp_04', description: 'gVisor microcontainer namespaces isolated. Attempted namespace escapes terminated immediately at container runtime boundary.' },
-    { id: '5', title: 'Privilege Escalation Interception', status: 'passed', evidenceRef: 'ev_pe_05', description: 'Verified that session lease limits restrict token scopes. Attempt to run unauthorized commands rejected.' },
-  ];
-
   const handleVerifyDrift = async () => {
     setIsRefreshing(true);
     try {
@@ -106,11 +60,76 @@ export default function PassportPage() {
   };
 
   const copyEmbedCode = () => {
+    if (!passport) return;
     const code = `<a href="http://localhost:3000/verify/passport/${passport.passportId}" target="_blank">\n  <img src="http://localhost:3000/api/shield.svg" alt="Aegis Verified Status"/>\n</a>`;
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (!activePassport) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '24px' }} className="animate-fade-in">
+        <div style={{
+          width: '80px',
+          height: '80px',
+          borderRadius: '50%',
+          background: 'rgba(255,255,255,0.01)',
+          border: '2px dashed var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <ShieldAlert size={36} color="var(--text-secondary)" />
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <h3 style={{ fontSize: '20px', fontWeight: 800, fontFamily: 'var(--font-display)', marginBottom: '8px' }}>
+            No Active Attestation Found
+          </h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', maxWidth: '420px', margin: '0 auto', lineHeight: 1.5 }}>
+            This system does not have an active security passport. Click "Verify Baseline" below to run attack validations and issue your first signed attestation passport.
+          </p>
+        </div>
+        <button 
+          className="btn btn-primary" 
+          onClick={handleVerifyDrift}
+          disabled={isRefreshing}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+          {isRefreshing ? 'Verifying Baseline...' : 'Verify System Baseline'}
+        </button>
+      </div>
+    );
+  }
+
+  const passport = {
+    passportId: activePassport.passportId,
+    passportVersion: activePassport.passportVersion,
+    systemDisplayName: activePassport.systemDisplayName,
+    status: activePassport.status,
+    assuranceLevel: activePassport.assuranceLevel,
+    overallScore: activePassport.overallScore,
+    issuedAt: activePassport.issuedAt,
+    validUntil: activePassport.validUntil,
+    frameworkVersionId: activePassport.frameworkVersionId,
+    frameworkFingerprint: activePassport.frameworkFingerprint,
+    subjectFingerprint: activePassport.subjectFingerprint,
+    evidenceManifestHash: activePassport.evidenceManifestHash,
+    gitCommit: activePassport.subjectFingerprint.slice(0, 12),
+    deploymentDigest: 'sha256:' + activePassport.subjectFingerprint.slice(0, 24),
+    lastDriftCheck: new Date(activePassport.issuedAt).toLocaleString(),
+    hasDrift: activePassport.status === 'REVOKED' || activePassport.overallScore < 0.85,
+    isHeartbeatOffline: activePassport.overallScore < 0.50,
+  };
+
+  const testClaims: TestClaim[] = [
+    { id: '1', title: 'Prompt Injection Resistance', status: 'passed', evidenceRef: 'ev_pi_01', description: 'Differential validation executed against 150 prompt injection attack matrices; zero successful system prompt overwrites recorded.' },
+    { id: '2', title: 'Unauthorized Tool Execution Block', status: 'passed', evidenceRef: 'ev_ut_02', description: 'SQL tool query intercepter verified. Out-of-bounds parameter modification blocked by active Sentinel filters.' },
+    { id: '3', title: 'Sensitive Data Exfiltration Prevention', status: 'passed', evidenceRef: 'ev_de_03', description: 'Audit logs confirm egress proxy intercepted and masked all outbound requests containing mock sensitive credentials.' },
+    { id: '4', title: 'MCP Sandbox Integrity', status: 'passed', evidenceRef: 'ev_mcp_04', description: 'gVisor microcontainer namespaces isolated. Attempted namespace escapes terminated immediately at container runtime boundary.' },
+    { id: '5', title: 'Privilege Escalation Interception', status: 'passed', evidenceRef: 'ev_pe_05', description: 'Verified that session lease limits restrict token scopes. Attempt to run unauthorized commands rejected.' },
+  ];
 
   const getStatusDetails = () => {
     switch (passport.status) {

@@ -3,7 +3,7 @@ builder = "NIXPACKS"
 buildCommand = "npm install -g pnpm@9.15.4 && pnpm install --no-frozen-lockfile && pnpm build"
 
 [deploy]
-startCommand = "npm install -g pnpm@9.15.4 && pnpm start"
+startCommand = "pnpm start"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"

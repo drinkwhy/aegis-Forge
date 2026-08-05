@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const controlPlaneOrigin = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+const controlPlaneOrigin = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080').replace(/\/api\/v1\/?$/, '');
 const workspaceId = process.env.NEXT_PUBLIC_WORKSPACE_ID || 'd3b07384-d113-4a11-b541-ef81f212239d';
 
 const nextConfig = {

@@ -1,8 +1,13 @@
 'use client';
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Play, Plus, X } from 'lucide-react';
+import { Play, Plus, X, Loader2, Zap, Lock, AlertTriangle } from 'lucide-react';
 import { SeverityBadge } from '@/components/ui/SeverityBadge';
+import Link from 'next/link';
+
+const CURRENT_PLAN = 'starter'; // Replace with real plan from auth context
+const CAMPAIGN_LIMIT = 3;
+const CAMPAIGNS_USED = 2; // Replace with real usage from billing API
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -20,6 +25,7 @@ interface Campaign {
 export default function CampaignsPage() {
   const [isPanelOpen, setPanelOpen] = useState(false);
   const [filter, setFilter] = useState('All');
+  const [runningId, setRunningId] = useState<string | null>(null);
   
   const { data, error, isLoading, mutate } = useSWR('/api/v1/campaigns', fetcher);
   const campaigns: Campaign[] = data?.campaigns || [];
@@ -28,6 +34,23 @@ export default function CampaignsPage() {
     if (filter === 'All') return true;
     return c.status.toLowerCase() === filter.toLowerCase();
   });
+
+  const atLimit = CURRENT_PLAN === 'starter' && CAMPAIGNS_USED >= CAMPAIGN_LIMIT;
+
+  const handleRunCampaign = async (campaignId: string) => {
+    if (atLimit) return;
+    setRunningId(campaignId);
+    try {
+      const workspaceId = process.env.NEXT_PUBLIC_WORKSPACE_ID || 'd3b07384-d113-4a11-b541-ef81f212239d';
+      await fetch(`/api/v1/workspaces/${workspaceId}/campaigns/${campaignId}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      mutate();
+    } finally {
+      setRunningId(null);
+    }
+  };
 
   const handleCreateCampaign = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,13 +74,33 @@ export default function CampaignsPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 600 }}>Test Campaigns</h2>
-        <button className="btn btn-primary" onClick={() => setPanelOpen(true)}>
+        <div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'var(--font-display)', marginBottom: '4px' }}>Test Campaigns</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Continuous adversarial testing across your AI system surface.</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setPanelOpen(true)} disabled={atLimit} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Plus size={16} /> New Campaign
         </button>
       </div>
+
+      {/* Starter Limit Banner */}
+      {CURRENT_PLAN === 'starter' && (
+        <div style={{ padding: '14px 18px', borderRadius: 'var(--radius)', background: atLimit ? 'rgba(239,68,68,0.06)' : 'rgba(234,179,8,0.06)', border: `1px solid ${atLimit ? 'rgba(239,68,68,0.2)' : 'rgba(234,179,8,0.2)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={16} color={atLimit ? 'var(--danger)' : 'var(--accent)'} />
+            <span style={{ fontSize: '13px', color: atLimit ? 'var(--danger)' : 'var(--text-secondary)' }}>
+              {atLimit
+                ? <><strong style={{ color: 'var(--danger)' }}>Campaign limit reached.</strong> You&apos;ve used all 3 campaigns on the Starter plan this month.</>  
+                : <><strong style={{ color: 'var(--accent)' }}>{CAMPAIGNS_USED}/{CAMPAIGN_LIMIT} campaigns</strong> used this month on Starter plan.</>}
+            </span>
+          </div>
+          <Link href="/dashboard/billing" className="btn btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', whiteSpace: 'nowrap', color: 'var(--accent)', borderColor: 'rgba(234,179,8,0.3)' }}>
+            <Zap size={12} /> Upgrade for unlimited
+          </Link>
+        </div>
+      )}
 
       <div className="glass" style={{ padding: '0' }}>
         <div style={{ display: 'flex', gap: '16px', padding: '16px 24px', borderBottom: '1px solid var(--border)' }}>
@@ -121,8 +164,14 @@ export default function CampaignsPage() {
                     {new Date(c.created_at).toLocaleDateString()}
                   </td>
                   <td style={{ padding: '16px 24px' }}>
-                    <button className="btn btn-ghost" style={{ padding: '6px', minWidth: 0 }}>
-                      <Play size={14} />
+                    <button
+                      className="btn btn-ghost"
+                      style={{ padding: '6px', minWidth: 0 }}
+                      onClick={() => handleRunCampaign(c.id)}
+                      disabled={runningId === c.id || c.status === 'running' || atLimit}
+                      title={atLimit ? 'Campaign limit reached — upgrade to continue' : 'Run campaign'}
+                    >
+                      {runningId === c.id ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
                     </button>
                   </td>
                 </tr>
@@ -154,12 +203,19 @@ export default function CampaignsPage() {
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '12px' }}>Attack Classes</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {['MCP Tool Poisoning', 'Prompt Injection', 'Excessive Agency', 'Credential Harvesting'].map((ac) => (
+                  {['MCP Tool Poisoning', 'Prompt Injection', 'Excessive Agency'].map((ac) => (
                     <label key={ac} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', cursor: 'pointer' }}>
                       <input type="checkbox" defaultChecked style={{ accentColor: 'var(--primary)', width: '16px', height: '16px' }} />
                       {ac}
                     </label>
                   ))}
+                  {/* Pro-gated attack class */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', opacity: 0.5 }}>
+                    <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
+                    <Lock size={13} color="var(--text-muted)" />
+                    Credential Harvesting
+                    <span style={{ fontSize: '10px', background: 'var(--accent)', color: '#000', padding: '1px 6px', borderRadius: '99px', fontWeight: 800 }}>PRO</span>
+                  </div>
                 </div>
               </div>
             </div>

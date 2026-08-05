@@ -1,7 +1,10 @@
 [build]
-buildCommand = "pnpm build"
+builder = "NIXPACKS"
+buildCommand = "npm install -g pnpm@9.15.4 && pnpm install --no-frozen-lockfile && pnpm build"
 
 [deploy]
-startCommand = "pnpm start"
+startCommand = "npm install -g pnpm@9.15.4 && pnpm start"
 healthcheckPath = "/dashboard"
 healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

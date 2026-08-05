@@ -1,9 +1,9 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+builder = "NIXPACKS"
+buildCommand = "npm install -g pnpm@9.15.4 && pnpm install --no-frozen-lockfile && pnpm --filter @aegis/web build"
 
 [deploy]
-startCommand = "pnpm --filter @aegis/web start"
+startCommand = "npm install -g pnpm@9.15.4 && pnpm --filter @aegis/web start"
 healthcheckPath = "/dashboard"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"

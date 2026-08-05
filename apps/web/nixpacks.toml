@@ -1,10 +1,11 @@
 providers = ["node"]
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "pnpm-9_x"]
+nixPkgs = ["nodejs_20"]
+cmds = ["npm install -g pnpm@9.15.4"]
 
 [phases.install]
-cmds = ["pnpm install"]
+cmds = ["pnpm install --no-frozen-lockfile"]
 
 [phases.build]
 cmds = ["pnpm build"]

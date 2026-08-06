@@ -13,25 +13,32 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      {
-        source: '/api/v1/campaigns',
-        destination: `${controlPlaneOrigin}/api/v1/workspaces/${workspaceId}/campaigns`,
-      },
-      {
-        source: '/api/v1/findings',
-        destination: `${controlPlaneOrigin}/api/v1/workspaces/${workspaceId}/findings`,
-      },
-      {
-        source: '/api/v1/remediations',
-        destination: `${controlPlaneOrigin}/api/v1/workspaces/${workspaceId}/remediations`,
-      },
-      {
-        // Catch-all — proxies all /api/v1/* directly to control-plane
-        source: '/api/v1/:path*',
-        destination: `${controlPlaneOrigin}/api/v1/:path*`,
-      },
-    ];
+    return {
+      // beforeFiles: checked before filesystem. Empty — let Next.js routes match first.
+      beforeFiles: [],
+      // afterFiles: checked AFTER Next.js filesystem routes fail. Proxy everything else.
+      afterFiles: [
+        {
+          source: '/api/v1/campaigns',
+          destination: `${controlPlaneOrigin}/api/v1/workspaces/${workspaceId}/campaigns`,
+        },
+        {
+          source: '/api/v1/findings',
+          destination: `${controlPlaneOrigin}/api/v1/workspaces/${workspaceId}/findings`,
+        },
+        {
+          source: '/api/v1/remediations',
+          destination: `${controlPlaneOrigin}/api/v1/workspaces/${workspaceId}/remediations`,
+        },
+        {
+          // Catch-all — only hits if no Next.js API route matched
+          source: '/api/v1/:path*',
+          destination: `${controlPlaneOrigin}/api/v1/:path*`,
+        },
+      ],
+      // fallback: last resort
+      fallback: [],
+    };
   },
 };
 

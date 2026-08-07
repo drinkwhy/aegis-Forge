@@ -3,9 +3,9 @@ import { getSql } from '@/lib/db';
 
 export async function GET(
   _req: NextRequest,
-  context: { params: Promise<{ orgId: string; id: string }> }
+  { params }: { params: Promise<{ orgId: string; id: string }> }
 ) {
-  const { orgId, id } = await context.params;
+  const { orgId, id } = await params;
   try {
     const sql = getSql();
     const events = await sql`
@@ -32,9 +32,9 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  context: { params: Promise<{ orgId: string; id: string }> }
+  { params }: { params: Promise<{ orgId: string; id: string }> }
 ) {
-  const { orgId, id } = await context.params;
+  const { orgId, id } = await params;
   try {
     const sql = getSql();
     const body = await req.json();

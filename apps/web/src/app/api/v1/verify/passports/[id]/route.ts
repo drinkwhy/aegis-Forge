@@ -3,9 +3,9 @@ import { getSql } from '@/lib/db';
 
 export async function GET(
   _req: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params;
+  const { id } = await params;
   const sql = getSql();
 
   try {

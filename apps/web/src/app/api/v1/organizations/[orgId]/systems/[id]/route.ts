@@ -14,9 +14,9 @@ const TRUST_SCORE_DELTA: Record<string, number> = {
 
 export async function GET(
   _req: NextRequest,
-  context: { params: Promise<{ orgId: string; id: string }> }
+  { params }: { params: Promise<{ orgId: string; id: string }> }
 ) {
-  const { orgId, id } = await context.params;
+  const { orgId, id } = await params;
   try {
     const sql = getSql();
     const [system] = await sql`
@@ -59,10 +59,10 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  context: { params: Promise<{ orgId: string; id: string }> }
+  { params }: { params: Promise<{ orgId: string; id: string }> }
 ) {
   // POST to system ID = record a runtime event
-  const { orgId, id } = await context.params;
+  const { orgId, id } = await params;
   try {
     const sql = getSql();
     const body = await req.json();

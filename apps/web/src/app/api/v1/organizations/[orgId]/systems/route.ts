@@ -51,9 +51,9 @@ async function ensureTables() {
 
 export async function GET(
   _req: NextRequest,
-  context: { params: Promise<{ orgId: string }> }
+  { params }: { params: Promise<{ orgId: string }> }
 ) {
-  const { orgId } = await context.params;
+  const { orgId } = await params;
   try {
     const sql = getSql();
     await ensureTables();
@@ -97,9 +97,9 @@ export async function GET(
 
 export async function POST(
   req: NextRequest,
-  context: { params: Promise<{ orgId: string }> }
+  { params }: { params: Promise<{ orgId: string }> }
 ) {
-  const { orgId } = await context.params;
+  const { orgId } = await params;
   try {
     const sql = getSql();
     await ensureTables();

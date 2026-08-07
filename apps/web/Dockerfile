@@ -30,11 +30,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
-ARG PORT=8080
-ENV PORT=$PORT
+ENV PORT=8080
 
-COPY --from=builder /app ./
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "pnpm --filter @aegis/web start"]
+CMD ["node", "apps/web/server.js"]

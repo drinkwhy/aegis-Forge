@@ -8,7 +8,6 @@ import {
   Terminal, Loader2, RefreshCw, CheckCircle,
 } from 'lucide-react';
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'd3b07384-d113-4a11-b541-ef81f212239e';
 const PUBLIC_BASE = typeof window !== 'undefined'
   ? (process.env.NEXT_PUBLIC_APP_URL || window.location.origin)
   : 'https://aegiscruc.io';
@@ -54,7 +53,7 @@ export default function PortalPassportDetail({ params }: PageProps) {
     setActionLoading(action);
     setActionError(null);
     try {
-      const res = await fetch(`/api/v1/organizations/${ORG_ID}/security-passports/${id}/${action}`, {
+      const res = await fetch(`/api/v1/my/passports/${id}/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: `${action} requested via Customer Portal` }),

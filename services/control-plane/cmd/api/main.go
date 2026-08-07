@@ -45,15 +45,9 @@ func main() {
 		log.Warn().Err(err).Msg("Failed to bootstrap Vault transit secrets engine")
 	}
 
-	// Bootstrap database tables with initial WealthFront organizations data if empty
-	if dbPool != nil {
-		if err := srv.PassportService().BootstrapMockData(context.Background()); err != nil {
-			log.Warn().Err(err).Msg("Failed to bootstrap database mock structures")
-		}
-	}
 
 	httpServer := &http.Server{
-		Addr:    ":" + cfg.Port,
+		Addr:    "0.0.0.0:" + cfg.Port,
 		Handler: srv.Router(),
 	}
 

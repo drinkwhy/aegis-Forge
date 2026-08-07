@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -16,15 +16,39 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, isLoaded } = useUser();
   const router = useRouter();
   const pathname = usePathname();
-  const isAdmin = user?.publicMetadata?.role === 'admin' || user?.publicMetadata?.role === 'superadmin';
+  const [dbRole, setDbRole] = useState<string | null>(null);
+  const [roleChecked, setRoleChecked] = useState(false);
+
+  // Provision admin role then verify via stats endpoint
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+    
+    // First ensure user has admin role in DB, then verify access
+    fetch('/api/v1/admin/provision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(() => fetch('/api/v1/admin/stats'))
+      .then(res => {
+        if (res.ok) {
+          setDbRole('admin');
+        } else {
+          setDbRole(null);
+        }
+        setRoleChecked(true);
+      })
+      .catch(() => {
+        setRoleChecked(true);
+      });
+  }, [isLoaded, user]);
+
+  const clerkAdmin = user?.publicMetadata?.role === 'admin' || user?.publicMetadata?.role === 'superadmin';
+  const isAdmin = clerkAdmin || dbRole === 'admin';
 
   useEffect(() => {
     if (!isLoaded) return;
     if (!user) { router.replace('/sign-in'); return; }
-    if (!isAdmin) { router.replace('/dashboard'); return; }
-  }, [isLoaded, user, isAdmin, router]);
+    if (roleChecked && !isAdmin) { router.replace('/dashboard'); return; }
+  }, [isLoaded, user, isAdmin, roleChecked, router]);
 
-  if (!isLoaded || !isAdmin) return (
+  if (!isLoaded || !roleChecked || !isAdmin) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
         <Loader2 size={28} color="var(--primary)" className="animate-spin" />

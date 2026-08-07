@@ -3,7 +3,6 @@ import useSWR from 'swr';
 import Link from 'next/link';
 import { ShieldCheck, AlertTriangle, PauseCircle, Ban, ExternalLink, Plus, RefreshCw, ChevronRight, Clock } from 'lucide-react';
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'd3b07384-d113-4a11-b541-ef81f212239e';
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 const STATUS_CFG: Record<string, { color: string; bg: string; icon: React.ElementType; label: string }> = {
@@ -60,7 +59,7 @@ function PassportCard({ passport }: { passport: Record<string, unknown> }) {
 }
 
 export default function PortalPassports() {
-  const { data, isLoading, mutate } = useSWR(`/api/v1/organizations/${ORG_ID}/security-passports`, fetcher, { refreshInterval: 30000 });
+  const { data, isLoading, mutate } = useSWR(`/api/v1/my/passports`, fetcher, { refreshInterval: 30000 });
   const passports = Array.isArray(data) ? data : [];
 
   return (
@@ -72,7 +71,7 @@ export default function PortalPassports() {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => mutate()} className="btn btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}><RefreshCw size={12} /> Refresh</button>
-          <Link href="/dashboard/passport" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}><Plus size={13} /> Issue New</Link>
+          <Link href="/security-audit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}><Plus size={13} /> Issue New</Link>
         </div>
       </div>
 
@@ -89,7 +88,7 @@ export default function PortalPassports() {
           </div>
           <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '8px' }}>No Passports Issued Yet</h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '320px', margin: '0 auto 20px', lineHeight: 1.6 }}>Issue your first Security Passport to prove your AI system&apos;s trustworthiness to customers and partners.</p>
-          <Link href="/dashboard/passport" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}><Plus size={14} /> Issue First Passport</Link>
+          <Link href="/security-audit" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}><Plus size={14} /> Issue First Passport</Link>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '18px' }}>

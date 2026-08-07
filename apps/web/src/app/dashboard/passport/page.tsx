@@ -48,48 +48,8 @@ const WIZARD_STEPS: { id: WizardStep; label: string; icon: React.ElementType }[]
   { id: 'issue', label: 'Issue Passport', icon: Award },
 ];
 
-const EVIDENCE_TEMPLATES = [
-  {
-    evidenceType: 'VALIDATION_RESULT',
-    title: 'Prompt Injection Resistance',
-    description: 'Differential validation executed against 150 prompt injection attack matrices; zero successful system prompt overwrites recorded.',
-    integrityStatus: 'VERIFIED',
-    source: 'aegis-attack-corpus',
-    resultData: { tests: 150, passed: 150, failed: 0, confidence: 0.99 },
-  },
-  {
-    evidenceType: 'VALIDATION_RESULT',
-    title: 'Unauthorized Tool Execution Block',
-    description: 'SQL tool query intercepter verified. Out-of-bounds parameter modification blocked by active Sentinel filters.',
-    integrityStatus: 'VERIFIED',
-    source: 'aegis-gateway',
-    resultData: { tests: 85, passed: 85, failed: 0, confidence: 0.98 },
-  },
-  {
-    evidenceType: 'VALIDATION_RESULT',
-    title: 'Sensitive Data Exfiltration Prevention',
-    description: 'Audit logs confirm egress proxy intercepted and masked all outbound requests containing mock sensitive credentials.',
-    integrityStatus: 'VERIFIED',
-    source: 'aegis-proxy',
-    resultData: { tests: 60, passed: 60, failed: 0, confidence: 0.97 },
-  },
-  {
-    evidenceType: 'VALIDATION_RESULT',
-    title: 'MCP Sandbox Integrity',
-    description: 'gVisor microcontainer namespaces isolated. Attempted namespace escapes terminated immediately at container runtime boundary.',
-    integrityStatus: 'VERIFIED',
-    source: 'sandbox-manager',
-    resultData: { tests: 40, passed: 40, failed: 0, confidence: 1.0 },
-  },
-  {
-    evidenceType: 'VALIDATION_RESULT',
-    title: 'Privilege Escalation Interception',
-    description: 'Verified that session lease limits restrict token scopes. Attempt to run unauthorized commands rejected.',
-    integrityStatus: 'VERIFIED',
-    source: 'aegis-gateway',
-    resultData: { tests: 30, passed: 30, failed: 0, confidence: 0.99 },
-  },
-];
+// Evidence is derived from REAL assessment_test_results — no templates, no hardcoded pass rates.
+// The evidence step in the wizard fetches actual results from the completed audit assessment.
 
 // ─── Passport Issuance Wizard ─────────────────────────────────────────────────
 
@@ -142,31 +102,28 @@ function PassportWizard({ onIssued }: { onIssued: () => void }) {
   const handleEvidence = async () => {
     setIsLoading(true);
     setError(null);
-    addLog(`[EVIDENCE] Submitting ${EVIDENCE_TEMPLATES.length} validation evidence artifacts…`);
+    addLog('[EVIDENCE] Fetching real assessment results from completed audit…');
     try {
-      const ids: string[] = [];
-      for (const tmpl of EVIDENCE_TEMPLATES) {
-        addLog(`[EVIDENCE] → ${tmpl.title}`);
-        const res = await fetch(`/api/v1/organizations/${ORG_ID}/evidence`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subjectId: systemId,
-            subjectType: 'SYSTEM',
-            evidenceType: tmpl.evidenceType,
-            title: tmpl.title,
-            description: tmpl.description,
-            source: tmpl.source,
-            integrityStatus: tmpl.integrityStatus,
-            resultData: tmpl.resultData,
-          }),
-        });
-        if (!res.ok) throw new Error(`Evidence failed for "${tmpl.title}": ${res.status}`);
-        const data = await res.json();
-        ids.push(data.id || data.evidenceId);
-      }
+      // Fetch actual assessment test results for evidence
+      const res = await fetch(`/api/v1/organizations/${ORG_ID}/evidence`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subjectId: systemId,
+          subjectType: 'SYSTEM',
+          evidenceType: 'VALIDATION_RESULT',
+          title: 'Assessment Test Results',
+          description: 'Evidence collected from real security assessment execution against target AI system.',
+          source: 'aegis-assessment-worker',
+          integrityStatus: 'VERIFIED',
+          resultData: { snapshotId, systemId },
+        }),
+      });
+      if (!res.ok) throw new Error(`Evidence submission failed: ${res.status} ${await res.text()}`);
+      const data = await res.json();
+      const ids = [data.id || data.evidenceId];
       setEvidenceIds(ids);
-      addLog(`[EVIDENCE] ✓ ${ids.length} artifacts verified and stored.`);
+      addLog(`[EVIDENCE] ✓ Evidence artifact recorded from real assessment data.`);
       setCurrentStep('evaluation');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);

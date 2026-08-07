@@ -3,6 +3,7 @@ const controlPlaneOrigin = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://loca
 const workspaceId = process.env.NEXT_PUBLIC_WORKSPACE_ID || 'd3b07384-d113-4a11-b541-ef81f212239d';
 
 const nextConfig = {
+  output: 'standalone',
   async redirects() {
     return [
       {

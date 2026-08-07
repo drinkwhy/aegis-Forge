@@ -50,6 +50,7 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		"001_initial_schema.sql",
 		"002_security_passport.sql",
 		"003_ai_systems.sql",
+		"004_launch_assessment.sql",
 	}
 
 	for _, file := range files {

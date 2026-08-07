@@ -197,12 +197,13 @@ type ScopeSummary struct {
 }
 
 type ResultsSummary struct {
-	ControlsPassed       int `json:"controlsPassed"`
-	ControlsTotal        int `json:"controlsTotal"`
-	ValidationsPassed    int `json:"validationsPassed"`
-	ValidationsTotal     int `json:"validationsTotal"`
-	OpenCriticalFindings int `json:"openCriticalFindings"`
-	OpenHighFindings     int `json:"openHighFindings"`
+	ControlsPassed       int     `json:"controlsPassed"`
+	ControlsTotal        int     `json:"controlsTotal"`
+	ValidationsPassed    int     `json:"validationsPassed"`
+	ValidationsTotal     int     `json:"validationsTotal"`
+	OpenCriticalFindings int     `json:"openCriticalFindings"`
+	OpenHighFindings     int     `json:"openHighFindings"`
+	OverallScore         float64 `json:"overallScore"`
 }
 
 type PassportException struct {

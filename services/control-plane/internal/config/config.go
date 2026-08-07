@@ -18,6 +18,8 @@ type Config struct {
 	VaultToken          string
 	ClickHouseURL       string
 	AegisForgeEnv       string
+	RedisURL            string
+	APISecret           string
 }
 
 func Load() *Config {
@@ -45,5 +47,7 @@ func Load() *Config {
 		VaultToken:          os.Getenv("VAULT_TOKEN"),
 		ClickHouseURL:       os.Getenv("CLICKHOUSE_URL"),
 		AegisForgeEnv:       os.Getenv("AEGIS_FORGE_ENV"),
+		RedisURL:            os.Getenv("REDIS_URL"),
+		APISecret:           os.Getenv("CONTROL_PLANE_API_SECRET"),
 	}
 }

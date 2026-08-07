@@ -1,10 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { Copy, RefreshCw, Github, Cloud, Key, UserPlus, Trash2, CheckCircle, Loader2, Users, Crown, Shield } from 'lucide-react';
 import Link from 'next/link';
 
-const CURRENT_PLAN = 'starter'; // Replace with real plan from auth context
-const SEAT_LIMIT = 1; // Starter: 1 seat, Pro: 5 seats
+const CURRENT_PLAN = 'starter';
+const SEAT_LIMIT = 1;
 
 interface TeamMember {
   id: string;
@@ -15,14 +16,11 @@ interface TeamMember {
   avatarInitials: string;
 }
 
-const MOCK_TEAM: TeamMember[] = [
-  { id: '1', name: 'You', email: 'you@acmecorp.io', role: 'owner', joinedAt: '2025-10-01', avatarInitials: 'AC' },
-];
-
 const ROLE_ICONS = { owner: Crown, admin: Shield, member: Users };
 const ROLE_COLORS = { owner: 'var(--accent)', admin: 'var(--primary)', member: 'var(--text-secondary)' };
 
 export default function SettingsPage() {
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -30,7 +28,22 @@ export default function SettingsPage() {
   const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
   const [isInviting, setIsInviting] = useState(false);
   const [inviteSent, setInviteSent] = useState(false);
-  const [team, setTeam] = useState<TeamMember[]>(MOCK_TEAM);
+
+  // Build team from real Clerk user data
+  const realTeam: TeamMember[] = useMemo(() => {
+    if (!user) return [];
+    const name = user.fullName || user.firstName || 'You';
+    const email = user.primaryEmailAddress?.emailAddress || 'unknown';
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    const joinedAt = user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    return [{ id: user.id, name, email, role: 'owner' as const, joinedAt, avatarInitials: initials }];
+  }, [user]);
+
+  const [team, setTeam] = useState<TeamMember[]>(realTeam);
+  // Sync when user loads
+  if (realTeam.length > 0 && team.length === 0) {
+    setTeam(realTeam);
+  }
 
   const handleSave = async () => {
     setIsSaving(true);

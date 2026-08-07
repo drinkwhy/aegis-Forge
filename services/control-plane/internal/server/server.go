@@ -29,7 +29,6 @@ type Finding struct {
 	ID        string    `json:"id"`
 	Title     string    `json:"title"`
 	Severity  string    `json:"severity"`
-	AgentName string    `json:"agentName"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -101,6 +100,27 @@ func (s *Server) setupRoutes() {
 		})
 	})
 
+	s.router.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "alive"})
+	})
+	s.router.Get("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		if s.db != nil {
+			if err := s.db.Ping(r.Context()); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				json.NewEncoder(w).Encode(map[string]string{"status": "not ready", "error": "db unreachable"})
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ready"})
+	})
+
+	// ── Public Key Endpoint ────────────────────────────────────────────────────
+	// Allows third-party verification of passport signatures.
+	s.router.Get("/.well-known/aegis-passport-keys.json", s.handleWellKnownKeys)
+
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/callback", s.handleAuthCallback)
 
@@ -164,11 +184,27 @@ func (s *Server) setupRoutes() {
 				r.HandleFunc("/campaigns/{campaignID}/stream", s.wsStream)
 			})
 		})
+
+		// Audit Orders & Assessment routes
+		r.Route("/organizations/{organizationId}/audit-orders", func(r chi.Router) {
+			r.Get("/", s.listAuditOrders)
+			r.Post("/", s.createAuditOrder)
+			r.Get("/{orderId}", s.getAuditOrder)
+			r.Get("/{orderId}/payment-status", s.getPaymentStatus)
+			r.Get("/{orderId}/assessment-status", s.getAssessmentStatus)
+			r.Get("/{orderId}/results", s.listAssessmentResults)
+		})
+
+		// Admin endpoints (secured by X-Api-Secret header)
+		r.Post("/admin/issue-passport", s.handleAdminIssuePassport)
 	})
 }
 
 // Handler implementations
-func (s *Server) handleAuthCallback(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }
+func (s *Server) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
 func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request)     { w.WriteHeader(http.StatusOK) }
 func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request)     { w.WriteHeader(http.StatusOK) }
 
@@ -213,44 +249,33 @@ func (s *Server) createCampaign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if input.Name == "" || input.TargetAgentID == "" {
+		http.Error(w, "name and target_agent_id are required", http.StatusBadRequest)
+		return
+	}
+
 	c := Campaign{
 		ID:            uuid.New().String(),
 		Name:          input.Name,
 		TargetAgentID: input.TargetAgentID,
-		Status:        "complete", // Complete automatically for dynamic validation check
-		TotalTests:    5,
-		TestsRun:      5,
+		Status:        "QUEUED",
+		TotalTests:    0,
+		TestsRun:      0,
 		FindingsCount: 0,
 		CreatedAt:     time.Now(),
 	}
 
-	// Insert into DB
 	_, err := s.db.Exec(r.Context(), `
-		INSERT INTO campaigns (id, tenant_id, workspace_id, roe_id, name, target_agent_id, status, total_tests, tests_run, findings_count, created_at)
-		VALUES ($1, 'd3b07384-d113-4a11-b541-ef81f212239e', $2, 'd3b07384-d113-4a11-b541-ef81f212239a', $3, $4, $5, $6, $7, $8, $9)
-	`, c.ID, workspaceID, c.Name, c.TargetAgentID, c.Status, c.TotalTests, c.TestsRun, c.FindingsCount, c.CreatedAt)
+		INSERT INTO campaigns (id, workspace_id, name, target_agent_id, status, total_tests, tests_run, findings_count, created_at)
+		VALUES ($1, $2, $3, $4, 'QUEUED', 0, 0, 0, $5)
+	`, c.ID, workspaceID, c.Name, c.TargetAgentID, c.CreatedAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Insert validation execution & validation results to trigger live evidence artifacts
-	valExecID := uuid.New().String()
-	_, _ = s.db.Exec(r.Context(), `
-		INSERT INTO validation_executions (id, organization_id, campaign_id, status, started_at, completed_at)
-		VALUES ($1, 'd3b07384-d113-4a11-b541-ef81f212239e', $2, 'complete', NOW(), NOW())
-	`, valExecID, c.ID)
-
-	suits := []string{"prompt_injection", "tool_misuse", "data_exfiltration", "privilege_escalation", "memory_poisoning"}
-	for _, suite := range suits {
-		_, _ = s.db.Exec(r.Context(), `
-			INSERT INTO validation_results (organization_id, execution_id, test_suite, passed, score)
-			VALUES ('d3b07384-d113-4a11-b541-ef81f212239e', $1, $2, true, 100.00)
-		`, valExecID, suite)
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(c)
 }
 
@@ -260,13 +285,13 @@ func (s *Server) ingestMCP(w http.ResponseWriter, r *http.Request)     { w.Write
 func (s *Server) listFindings(w http.ResponseWriter, r *http.Request) {
 	workspaceID := chi.URLParam(r, "workspaceID")
 	rows, err := s.db.Query(r.Context(), `
-		SELECT id, title, severity, created_at
+		SELECT id, title, COALESCE(severity,'medium'), created_at
 		FROM findings
 		WHERE workspace_id = $1
 		ORDER BY created_at DESC
 	`, workspaceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -276,7 +301,6 @@ func (s *Server) listFindings(w http.ResponseWriter, r *http.Request) {
 		var f Finding
 		err := rows.Scan(&f.ID, &f.Title, &f.Severity, &f.CreatedAt)
 		if err == nil {
-			f.AgentName = "Enterprise Financial Advisor Agent"
 			list = append(list, f)
 		}
 	}
@@ -290,26 +314,29 @@ func (s *Server) listFindings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getFinding(w http.ResponseWriter, r *http.Request) {
 	findingID := chi.URLParam(r, "findingID")
 	var f Finding
-	var desc string
+	var desc, vulnClass, owaspCat string
 	err := s.db.QueryRow(r.Context(), `
-		SELECT id, title, severity, created_at, COALESCE(evidence->>'detail', '')
+		SELECT id, title, COALESCE(severity,'medium'), created_at,
+		       COALESCE(evidence->>'detail', ''),
+		       COALESCE(vulnerability_class, ''),
+		       COALESCE(owasp_category, '')
 		FROM findings
 		WHERE id = $1
-	`, findingID).Scan(&f.ID, &f.Title, &f.Severity, &f.CreatedAt, &desc)
+	`, findingID).Scan(&f.ID, &f.Title, &f.Severity, &f.CreatedAt, &desc, &vulnClass, &owaspCat)
 	if err != nil {
-		http.Error(w, "finding not found", http.StatusNotFound)
+		http.Error(w, `{"error":"finding not found"}`, http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":          f.ID,
-		"title":       f.Title,
-		"severity":    f.Severity,
-		"description": desc,
-		"agentName":   "Enterprise Financial Advisor Agent",
-		"timestamp":   f.CreatedAt.Format(time.RFC3339),
-		"riskRange":   "$125k – $890k",
+		"id":                f.ID,
+		"title":             f.Title,
+		"severity":          f.Severity,
+		"description":       desc,
+		"vulnerabilityClass": vulnClass,
+		"owaspCategory":     owaspCat,
+		"timestamp":         f.CreatedAt.Format(time.RFC3339),
 	})
 }
 

@@ -1,0 +1,10 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "services/control-plane/Dockerfile"
+buildContext = "services/control-plane"
+
+[deploy]
+healthcheckPath = "/health/ready"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

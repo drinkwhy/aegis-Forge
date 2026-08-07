@@ -12,7 +12,7 @@ export function getSql() {
       throw new Error('DATABASE_URL not configured');
     }
     _sql = postgres(url, {
-      ssl: url.includes('railway.internal') ? false : { rejectUnauthorized: false },
+      ssl: (url.includes('localhost') || url.includes('127.0.0.1') || url.includes('railway.internal')) ? false : { rejectUnauthorized: false },
       max: 5,
       idle_timeout: 30,
     });

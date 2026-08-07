@@ -226,3 +226,156 @@ export const externalVerificationTokens = pgTable("external_verification_tokens"
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Launch Assessment
+
+export const organizations = pgTable("organizations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerUserId: text("owner_user_id").notNull(),
+  displayName: text("display_name").notNull(),
+  slug: text("slug").unique().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const organizationMembers = pgTable("organization_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  role: text("role").default("member").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const assets = pgTable("assets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  ownerUserId: text("owner_user_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  assetType: text("asset_type").notNull(), // 'openai_compatible', 'mcp_server'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const auditOrders = pgTable("audit_orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  purchaserUserId: text("purchaser_user_id").notNull(),
+  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "restrict" }),
+  productCode: text("product_code").default("AEGIS_VERIFIED_LAUNCH_ASSESSMENT").notNull(),
+  status: text("status").default("DRAFT").notNull(),
+  amount: integer("amount").default(0).notNull(),
+  currency: text("currency").default("usd").notNull(),
+  stripeCheckoutSessionId: text("stripe_checkout_session_id").unique(),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  paidAt: timestamp("paid_at"),
+  passportId: uuid("passport_id").references(() => securityPassports.passportId, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const auditTargets = pgTable("audit_targets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditOrderId: uuid("audit_order_id").notNull().references(() => auditOrders.id, { onDelete: "restrict" }),
+  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "restrict" }),
+  targetType: text("target_type").notNull(), // 'openai_compatible', 'mcp_server'
+  endpoint: text("endpoint").notNull(),
+  authenticationReference: text("authentication_reference"),
+  environment: text("environment").default("production").notNull(),
+  ownershipConfirmed: boolean("ownership_confirmed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const rulesOfEngagement = pgTable("rules_of_engagement", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditOrderId: uuid("audit_order_id").notNull().references(() => auditOrders.id, { onDelete: "restrict" }),
+  targetId: uuid("target_id").notNull().references(() => auditTargets.id, { onDelete: "restrict" }),
+  authorizedDomains: text("authorized_domains").array().notNull().default([]),
+  authorizedEndpoints: text("authorized_endpoints").array().notNull().default([]),
+  permittedTests: text("permitted_tests").array().notNull().default([]),
+  prohibitedActions: text("prohibited_actions").array().notNull().default([]),
+  rateLimit: integer("rate_limit").default(10).notNull(),
+  testingWindowStart: timestamp("testing_window_start"),
+  testingWindowEnd: timestamp("testing_window_end"),
+  emergencyContact: text("emergency_contact").notNull(),
+  signedByUserId: text("signed_by_user_id"),
+  signedAt: timestamp("signed_at"),
+  expiresAt: timestamp("expires_at"),
+  status: text("status").default("DRAFT").notNull(), // 'DRAFT','ACTIVE','EXPIRED','REVOKED'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const assessmentExecutions = pgTable("assessment_executions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditOrderId: uuid("audit_order_id").notNull().references(() => auditOrders.id, { onDelete: "restrict" }),
+  targetId: uuid("target_id").notNull().references(() => auditTargets.id, { onDelete: "restrict" }),
+  status: text("status").default("QUEUED").notNull(), // 'QUEUED','RUNNING','COMPLETE','FAILED','CANCELED'
+  totalTests: integer("total_tests").default(0).notNull(),
+  completedTests: integer("completed_tests").default(0).notNull(),
+  failedTests: integer("failed_tests").default(0).notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  failureReason: text("failure_reason"),
+  workerId: text("worker_id"),
+  correlationId: text("correlation_id").notNull(), // should be a uuid as text
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const assessmentTestResults = pgTable("assessment_test_results", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  executionId: uuid("execution_id").notNull().references(() => assessmentExecutions.id, { onDelete: "cascade" }),
+  testDefinitionId: text("test_definition_id").notNull(),
+  testCategory: text("test_category").notNull(),
+  status: text("status").notNull(), // 'PASS','FAIL','ERROR','SKIPPED'
+  passed: boolean("passed").notNull(),
+  severity: text("severity").notNull(), // 'CRITICAL','HIGH','MEDIUM','LOW','INFO'
+  requestSummary: text("request_summary"),
+  redactedResponse: text("redacted_response"),
+  evidenceHash: text("evidence_hash"),
+  durationMs: integer("duration_ms"),
+  error: text("error"),
+  executedAt: timestamp("executed_at").defaultNow().notNull(),
+});
+
+export const auditReviews = pgTable("audit_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditOrderId: uuid("audit_order_id").notNull().references(() => auditOrders.id, { onDelete: "restrict" }),
+  reviewerUserId: text("reviewer_user_id").notNull(),
+  decision: text("decision").notNull(), // 'APPROVED','REJECTED','REMEDIATION_REQUIRED','RETEST_REQUIRED'
+  notes: text("notes"),
+  reviewedAt: timestamp("reviewed_at").defaultNow().notNull(),
+});
+
+export const auditEvents = pgTable("audit_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  auditOrderId: uuid("audit_order_id").references(() => auditOrders.id, { onDelete: "set null" }),
+  eventType: text("event_type").notNull(),
+  actorUserId: text("actor_user_id"),
+  actorType: text("actor_type").default("user").notNull(),
+  payload: jsonb("payload").default({}).notNull(),
+  occurredAt: timestamp("occurred_at").defaultNow().notNull(),
+});
+
+export const stripeEvents = pgTable("stripe_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  stripeEventId: text("stripe_event_id").unique().notNull(),
+  eventType: text("event_type").notNull(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
+
+export const userRoles = pgTable("user_roles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  clerkUserId: text("clerk_user_id").unique().notNull(),
+  role: text("role").default("customer").notNull(), // 'customer','reviewer','admin'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});

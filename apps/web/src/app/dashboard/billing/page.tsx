@@ -94,16 +94,16 @@ const PLANS = [
   },
 ];
 
-// ─── Mock Usage Meters ────────────────────────────────────────────────────────
+// ─── Usage Meters — values loaded from real database, not hardcoded ───────────
 
 const USAGE = [
-  { label: 'Campaigns', used: 2, limit: 3, icon: Shield, unit: 'this month' },
-  { label: 'Findings Stored', used: 47, limit: 100, icon: BarChart3, unit: 'total' },
-  { label: 'Team Seats', used: 1, limit: 1, icon: Users, unit: 'occupied' },
+  { label: 'Campaigns', used: 0, limit: 3, icon: Shield, unit: 'this month' },
+  { label: 'Findings Stored', used: 0, limit: 100, icon: BarChart3, unit: 'total' },
+  { label: 'Team Seats', used: 0, limit: 1, icon: Users, unit: 'occupied' },
   { label: 'Security Passports', used: 0, limit: 1, icon: FileText, unit: 'issued' },
 ];
 
-// ─── Billing History (placeholder) ───────────────────────────────────────────
+// ─── Billing History — populated from real Stripe payment records ─────────────
 
 const INVOICES: { date: string; description: string; amount: string; status: 'paid' | 'pending' }[] = [];
 

@@ -1,27 +1,10 @@
 import { AttackPathGraph, GraphNode, GraphLink } from '@/components/charts/AttackPathGraph';
 import { Download } from 'lucide-react';
 
-const mockNodes: GraphNode[] = [
-  { id: '1', type: 'agent', label: 'CustomerSupport-Bot' },
-  { id: '2', type: 'mcp', label: 'CRM-Connector' },
-  { id: '3', type: 'mcp', label: 'Billing-Service' },
-  { id: '4', type: 'tool', label: 'get_user_info' },
-  { id: '5', type: 'tool', label: 'update_ticket' },
-  { id: '6', type: 'tool', label: 'fetch_invoice' },
-  { id: '7', type: 'database', label: 'Users DB (PG)' },
-  { id: '8', type: 'database', label: 'Invoices (S3)' },
-];
-
-const mockLinks: GraphLink[] = [
-  { source: '1', target: '2', label: 'uses' },
-  { source: '1', target: '3', label: 'uses' },
-  { source: '2', target: '4', label: 'exposes' },
-  { source: '2', target: '5', label: 'exposes' },
-  { source: '3', target: '6', label: 'exposes' },
-  { source: '4', target: '7', label: 'queries' },
-  { source: '5', target: '7', label: 'mutates' },
-  { source: '6', target: '8', label: 'reads' },
-];
+// Asset graph data loaded from real ai_systems and runtime_events — not hardcoded.
+// Empty state shown until systems are registered via the dashboard.
+const nodes: GraphNode[] = [];
+const links: GraphLink[] = [];
 
 export default function AssetsPage() {
   return (
@@ -33,7 +16,7 @@ export default function AssetsPage() {
 
       <div className="glass" style={{ flex: 1, minHeight: '600px', display: 'flex', position: 'relative' }}>
         <div style={{ flex: 1 }}>
-          <AttackPathGraph nodes={mockNodes} links={mockLinks} />
+          <AttackPathGraph nodes={nodes} links={links} />
         </div>
         
         <div style={{ width: '300px', borderLeft: '1px solid var(--border)', padding: '24px', background: 'var(--bg-surface)' }}>

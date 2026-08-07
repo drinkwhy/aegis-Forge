@@ -92,8 +92,25 @@ services:
     cap_add:
       - IPC_LOCK
 
+  # ============================================================
+  # Redis (Assessment Job Queue)
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: aegiscruc-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:
   neo4j_data:
   clickhouse_data:
   redpanda_data:
+  redis_data:

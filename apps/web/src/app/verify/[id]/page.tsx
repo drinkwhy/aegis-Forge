@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Shield, CheckCircle, XCircle, AlertTriangle, Clock, ExternalLink, Copy, Loader2 } from 'lucide-react';
 
@@ -96,9 +96,11 @@ export default function VerifyPassportPage() {
   };
 
   // Auto-verify on mount
-  if (!passport && !error && !loading && passportId) {
-    verify();
-  }
+  useEffect(() => {
+    if (passportId && !passport && !error && !loading) {
+      verify();
+    }
+  }, [passportId]);
 
   const statusCfg = passport ? STATUS_CONFIG[passport.status] || STATUS_CONFIG.EXPIRED : null;
   const assuranceCfg = passport ? ASSURANCE_LABELS[passport.assuranceLevel] || ASSURANCE_LABELS.OBSERVED : null;

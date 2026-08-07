@@ -13,12 +13,11 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    const rawApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-    const isExternal = rawApiUrl && !rawApiUrl.includes('localhost') && !rawApiUrl.includes('127.0.0.1');
-    if (!isExternal) {
+    const targetUrl = process.env.CONTROL_PLANE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || (process.env.NODE_ENV === 'production' ? 'http://control-plane.railway.internal:8080' : '');
+    if (!targetUrl || targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
       return [];
     }
-    const origin = rawApiUrl.replace(/\/api\/v1\/?$/, '');
+    const origin = targetUrl.replace(/\/api\/v1\/?$/, '');
     return [
       {
         source: '/api/v1/:path*',

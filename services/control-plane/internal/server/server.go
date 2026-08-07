@@ -124,6 +124,10 @@ func (s *Server) setupRoutes() {
 	s.router.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/callback", s.handleAuthCallback)
 
+		// Top-level AI System Registry fallback
+		r.Get("/systems", s.listAISystems)
+		r.Post("/systems", s.createAISystem)
+
 		// Verification Endpoints
 		r.Post("/verify/passports/{passportId}", s.passportHandler.CreateVerificationToken)
 		r.Get("/verify/passports/{passportId}", s.passportHandler.VerifyPassport)

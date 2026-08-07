@@ -5,9 +5,9 @@ WORKDIR /app
 RUN npm install -g pnpm@9.15.4
 
 # Copy workspace config
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmr[c] ./
-COPY packages/db/package.json packages/db/
-COPY apps/web/package.json apps/web/
+COPY package.jso[n] pnpm-workspace.yam[l] pnpm-lock.yam[l] .npmr[c] ./
+COPY packages/db/package.jso[n] packages/db/
+COPY apps/web/package.jso[n] apps/web/
 
 RUN pnpm install --frozen-lockfile
 

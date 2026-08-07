@@ -5,7 +5,7 @@ WORKDIR /app
 RUN npm install -g pnpm@9.15.4
 
 # Copy workspace config
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmr[c] ./
 COPY packages/db/package.json packages/db/
 COPY apps/web/package.json apps/web/
 
@@ -29,6 +29,8 @@ RUN pnpm --filter @aegis/web build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+ARG PORT=8080
+ENV PORT=$PORT
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -41,9 +43,7 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 
 USER nextjs
 
-EXPOSE ${PORT:-3000}
-
-ENV PORT=${PORT:-3000}
+EXPOSE $PORT
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "apps/web/server.js"]

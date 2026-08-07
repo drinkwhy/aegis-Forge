@@ -10,7 +10,41 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { auditOrderId, organizationId } = body;
+  const { auditOrderId, organizationId, planId } = body;
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
+  const sql = getSql();
+
+  // If this is a subscription upgrade request for a plan
+  if (planId) {
+    if (process.env.AEGIS_SKIP_PAYMENT === 'true') {
+      const successUrl = `${baseUrl}/dashboard/billing?success=true&plan=${planId}`;
+      return NextResponse.json({ url: successUrl, sessionId: 'skip_payment' });
+    }
+
+    const priceId = process.env.STRIPE_PRICE_ID;
+    const stripeSecret = process.env.STRIPE_SECRET_KEY;
+    if (!priceId || !stripeSecret) {
+      return NextResponse.json(
+        { error: 'Stripe not configured. Set STRIPE_SECRET_KEY and STRIPE_PRICE_ID in .env' },
+        { status: 503 }
+      );
+    }
+
+    const stripe = getStripe();
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${baseUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/dashboard/billing?canceled=true`,
+      metadata: { organizationId: organizationId || 'default', userId, planId },
+    });
+
+    return NextResponse.json({ url: session.url, sessionId: session.id });
+  }
 
   if (!auditOrderId || !organizationId) {
     return NextResponse.json(
@@ -18,8 +52,6 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-
-  const sql = getSql();
 
   // Load and verify the order belongs to this user and is in DRAFT status
   const [order] = await sql`
@@ -40,9 +72,6 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
-
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
   // ── Explicit dev payment bypass ───────────────────────────────────────────
   // Set AEGIS_SKIP_PAYMENT=true in .env to bypass Stripe in development.

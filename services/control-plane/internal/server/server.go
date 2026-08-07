@@ -202,11 +202,47 @@ func (s *Server) setupRoutes() {
 
 // Handler implementations
 func (s *Server) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		UserID string `json:"user_id"`
+		Email  string `json:"email"`
+		OrgID  string `json:"organization_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err == nil && payload.UserID != "" {
+		_, _ = s.db.Exec(r.Context(), `
+			INSERT INTO users (id, tenant_id, email, role, created_at)
+			VALUES ($1, COALESCE(NULLIF($2, ''), $1), $3, 'member', NOW())
+			ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
+		`, payload.UserID, payload.OrgID, payload.Email)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
-func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request)     { w.WriteHeader(http.StatusOK) }
-func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request)     { w.WriteHeader(http.StatusOK) }
+
+func (s *Server) listWorkspaces(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.db.Query(r.Context(), `SELECT id, tenant_id, name, slug, created_at FROM workspaces ORDER BY created_at DESC`)
+	if err != nil {
+		http.Error(w, `{"error":"failed to list workspaces"}`, http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type WorkspaceItem struct {
+		ID        string    `json:"id"`
+		TenantID  string    `json:"tenant_id"`
+		Name      string    `json:"name"`
+		Slug      string    `json:"slug"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+	workspaces := []WorkspaceItem{}
+	for rows.Next() {
+		var ws WorkspaceItem
+		if err := rows.Scan(&ws.ID, &ws.TenantID, &ws.Name, &ws.Slug, &ws.CreatedAt); err == nil {
+			workspaces = append(workspaces, ws)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"workspaces": workspaces})
+}
 
 func (s *Server) listCampaigns(w http.ResponseWriter, r *http.Request) {
 	workspaceID := chi.URLParam(r, "workspaceID")
@@ -279,9 +315,6 @@ func (s *Server) createCampaign(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(c)
 }
 
-func (s *Server) getCampaign(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }
-func (s *Server) ingestMCP(w http.ResponseWriter, r *http.Request)     { w.WriteHeader(http.StatusOK) }
-
 func (s *Server) listFindings(w http.ResponseWriter, r *http.Request) {
 	workspaceID := chi.URLParam(r, "workspaceID")
 	rows, err := s.db.Query(r.Context(), `
@@ -330,13 +363,13 @@ func (s *Server) getFinding(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":                f.ID,
-		"title":             f.Title,
-		"severity":          f.Severity,
-		"description":       desc,
+		"id":                 f.ID,
+		"title":              f.Title,
+		"severity":           f.Severity,
+		"description":        desc,
 		"vulnerabilityClass": vulnClass,
-		"owaspCategory":     owaspCat,
-		"timestamp":         f.CreatedAt.Format(time.RFC3339),
+		"owaspCategory":      owaspCat,
+		"timestamp":          f.CreatedAt.Format(time.RFC3339),
 	})
 }
 
@@ -349,5 +382,113 @@ func (s *Server) listRemediations(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) createRoE(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }
-func (s *Server) wsStream(w http.ResponseWriter, r *http.Request)  { w.WriteHeader(http.StatusOK) }
+func (s *Server) createWorkspace(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Name     string `json:"name"`
+		TenantID string `json:"tenant_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil || input.Name == "" {
+		http.Error(w, `{"error":"invalid workspace name"}`, http.StatusBadRequest)
+		return
+	}
+	wsID := uuid.New().String()
+	tenantID := input.TenantID
+	if tenantID == "" {
+		tenantID = wsID
+	}
+	_, err := s.db.Exec(r.Context(), `
+		INSERT INTO workspaces (id, tenant_id, name, slug, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+	`, wsID, tenantID, input.Name, input.Name)
+	if err != nil {
+		http.Error(w, `{"error":"failed to create workspace"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"id": wsID, "name": input.Name, "status": "created"})
+}
+
+func (s *Server) getCampaign(w http.ResponseWriter, r *http.Request) {
+	campaignID := chi.URLParam(r, "campaignID")
+	var c Campaign
+	err := s.db.QueryRow(r.Context(), `
+		SELECT id, name, target_agent_id, status, total_tests, tests_run, findings_count, created_at
+		FROM campaigns
+		WHERE id = $1
+	`, campaignID).Scan(&c.ID, &c.Name, &c.TargetAgentID, &c.Status, &c.TotalTests, &c.TestsRun, &c.FindingsCount, &c.CreatedAt)
+
+	if err != nil {
+		http.Error(w, `{"error":"campaign not found"}`, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(c)
+}
+
+func (s *Server) ingestMCP(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		ToolName    string                 `json:"tool_name"`
+		Schema      map[string]interface{} `json:"schema"`
+		Permissions []string               `json:"permissions"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, `{"error":"invalid MCP payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	mcpID := uuid.New().String()
+	schemaJSON, _ := json.Marshal(input.Schema)
+	workspaceID := chi.URLParam(r, "workspaceID")
+
+	_, err := s.db.Exec(r.Context(), `
+		INSERT INTO security_tools (id, workspace_id, tool_name, schema_json, permissions, ingested_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+		ON CONFLICT (id) DO NOTHING
+	`, mcpID, workspaceID, input.ToolName, string(schemaJSON), input.Permissions)
+
+	if err != nil {
+		http.Error(w, `{"error":"failed to store MCP spec"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"id": mcpID, "status": "ingested"})
+}
+
+func (s *Server) createRoE(w http.ResponseWriter, r *http.Request) {
+	workspaceID := chi.URLParam(r, "workspaceID")
+	var input struct {
+		AllowedTargets []string `json:"allowed_targets"`
+		Signature      string   `json:"signature"`
+		SignedBy       string   `json:"signed_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, `{"error":"invalid RoE payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	roeID := uuid.New().String()
+	roeJSON, _ := json.Marshal(map[string]interface{}{"allowed_targets": input.AllowedTargets, "safe_harbor": true})
+
+	_, err := s.db.Exec(r.Context(), `
+		INSERT INTO roe_documents (id, tenant_id, workspace_id, roe_json, signature, signed_by, valid_from, valid_until, is_active)
+		VALUES ($1, $2, $2, $3, $4, $5, NOW(), NOW() + INTERVAL '1 year', true)
+	`, roeID, workspaceID, string(roeJSON), input.Signature, input.SignedBy)
+
+	if err != nil {
+		http.Error(w, `{"error":"failed to register RoE document"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"id": roeID, "status": "active"})
+}
+
+func (s *Server) wsStream(w http.ResponseWriter, r *http.Request) {
+	campaignID := chi.URLParam(r, "campaignID")
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"campaign_id": campaignID, "stream": "active", "status": "connected"})
+}

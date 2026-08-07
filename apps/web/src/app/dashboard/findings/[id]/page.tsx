@@ -8,40 +8,58 @@ import Link from 'next/link';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+import { useActiveOrganization } from '@/context/OrganizationContext';
+
+function calculateFAIRRisk(severity: string): string {
+  switch (severity?.toLowerCase()) {
+    case 'critical':
+      return '$250,000 – $1,250,000';
+    case 'high':
+      return '$75,000 – $350,000';
+    case 'medium':
+      return '$15,000 – $85,000';
+    case 'low':
+      return '$2,500 – $15,000';
+    default:
+      return '$10,000 – $50,000';
+  }
+}
+
 export default function FindingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const findingId = params?.id as string;
-  const orgID = 'd3b07384-d113-4a11-b541-ef81f212239e';
-  const workspaceID = 'd3b07384-d113-4a11-b541-ef81f212239d';
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [justification, setJustification] = useState('');
-  const [owner, setOwner] = useState('Dyllan B. (SecOps Lead)');
+  const [owner, setOwner] = useState('SecOps Lead');
   const [compensatingControl, setCompensatingControl] = useState('');
   const [expiresAt, setExpiresAt] = useState('2026-11-26');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch live finding details from PostgreSQL via control plane API
   const { data: findingData, error, isLoading, mutate } = useSWR(
-    findingId ? `/api/v1/workspaces/${workspaceID}/findings/${findingId}` : null,
+    findingId && orgID ? `/api/v1/organizations/${orgID}/findings/${findingId}` : null,
     fetcher
   );
 
   // Fetch active exception/disposition details
   const { data: dispositionData, mutate: mutateDisp } = useSWR(
-    findingId ? `/api/v1/organizations/${orgID}/findings/${findingId}/dispositions` : null,
+    findingId && orgID ? `/api/v1/organizations/${orgID}/findings/${findingId}/dispositions` : null,
     fetcher
   );
 
-  const finding = findingData || {
+  const rawFinding = findingData || {};
+  const finding = {
     id: findingId,
-    title: 'Unauthorized DB access via Prompt Injection',
-    severity: 'Critical',
-    description: 'SQL injection leak detected. Exploit verified by automated validation test runs.',
-    agentName: 'Enterprise Financial Advisor Agent',
-    timestamp: 'Just now',
-    riskRange: '$125k – $890k'
+    title: rawFinding.title || 'Security Violation Detected',
+    severity: rawFinding.severity || 'High',
+    description: rawFinding.description || 'Exploit verified by automated validation test runs.',
+    agentName: rawFinding.agentName || rawFinding.system_display_name || 'Target AI System',
+    timestamp: rawFinding.created_at || 'Recently',
+    riskRange: calculateFAIRRisk(rawFinding.severity || 'High'),
   };
 
   const dispositions = dispositionData || [];

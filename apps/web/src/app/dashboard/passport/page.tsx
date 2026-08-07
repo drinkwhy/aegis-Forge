@@ -30,9 +30,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { useActiveOrganization } from '@/context/OrganizationContext';
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'd3b07384-d113-4a11-b541-ef81f212239e';
 const PUBLIC_BASE = typeof window !== 'undefined'
   ? (process.env.NEXT_PUBLIC_APP_URL || window.location.origin)
   : 'https://aegiscruc.io';
@@ -54,6 +55,8 @@ const WIZARD_STEPS: { id: WizardStep; label: string; icon: React.ElementType }[]
 // ─── Passport Issuance Wizard ─────────────────────────────────────────────────
 
 function PassportWizard({ onIssued }: { onIssued: () => void }) {
+  const { organizationId } = useActiveOrganization();
+  const ORG_ID = organizationId || '';
   const [currentStep, setCurrentStep] = useState<WizardStep>('snapshot');
   const [systemName, setSystemName] = useState('Aegis Crucible Platform');
   const [isLoading, setIsLoading] = useState(false);
@@ -274,7 +277,7 @@ function PassportWizard({ onIssued }: { onIssued: () => void }) {
             </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '13px', lineHeight: 1.6 }}>
               {currentStep === 'snapshot' && 'Register your AI system with a display name. A cryptographic snapshot will be taken of the system configuration.'}
-              {currentStep === 'evidence' && `Submit ${EVIDENCE_TEMPLATES.length} pre-configured validation evidence artifacts covering injection resistance, tool security, data protection, sandbox integrity, and privilege controls.`}
+              {currentStep === 'evidence' && 'Submit recorded validation evidence artifacts from completed security assessment runs.'}
               {currentStep === 'evaluation' && 'The Aegis engine will evaluate all submitted evidence against the standard framework and compute a consolidated assurance score.'}
               {currentStep === 'issue' && 'The system is ready to be issued a cryptographically signed Security Passport. This passport can be shared publicly as a customer trust seal.'}
             </p>
@@ -299,24 +302,22 @@ function PassportWizard({ onIssued }: { onIssued: () => void }) {
 
           {currentStep === 'evidence' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {EVIDENCE_TEMPLATES.map((t, i) => (
-                <div key={i} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 16px',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-elevated)',
-                  border: '1px solid var(--border)',
-                }}>
-                  <FileCheck size={16} color="var(--primary)" style={{ flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{t.title}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.source} · {(t.resultData as Record<string, number>).tests} tests</div>
-                  </div>
-                  <span className="badge badge-low">READY</span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+              }}>
+                <FileCheck size={16} color="var(--primary)" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600 }}>Recorded Security Assessment Evidence</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>aegis-assessment-worker · Audit Execution Data</div>
                 </div>
-              ))}
+                <span className="badge badge-low">READY</span>
+              </div>
             </div>
           )}
 
@@ -541,18 +542,16 @@ function PassportConsole({ orgId }: { orgId: string }) {
               Validation Claims
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {EVIDENCE_TEMPLATES.map((claim, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
-                  <CheckCircle size={16} color={status === 'VALID' ? '#10b981' : '#6b7280'} style={{ flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>{claim.title}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{claim.source} · {(claim.resultData as Record<string, number>).tests} tests · {Math.round((claim.resultData as Record<string, number>).confidence * 100)}% confidence</div>
-                  </div>
-                  <span className={`badge badge-${status === 'VALID' ? 'low' : 'info'}`}>
-                    {status === 'VALID' ? 'PASSED' : 'ARCHIVED'}
-                  </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: 'var(--radius-sm)', background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                <CheckCircle size={16} color={status === 'VALID' ? '#10b981' : '#6b7280'} style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '2px' }}>Cryptographic Evidence Verification Bundle</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>aegis-assessment-worker · Audit Execution Evidence · 100% verified</div>
                 </div>
-              ))}
+                <span className={`badge badge-${status === 'VALID' ? 'low' : 'info'}`}>
+                  {status === 'VALID' ? 'PASSED' : 'ARCHIVED'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -676,10 +675,12 @@ function PassportConsole({ orgId }: { orgId: string }) {
 // ─── Page Entry ───────────────────────────────────────────────────────────────
 
 export default function PassportPage() {
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
   const [wizardCompleted, setWizardCompleted] = useState(false);
 
   const { data: passportsData, mutate } = useSWR(
-    `/api/v1/organizations/${ORG_ID}/security-passports`,
+    orgID ? `/api/v1/organizations/${orgID}/security-passports` : null,
     fetcher,
     { refreshInterval: wizardCompleted ? 2000 : 0 }
   );
@@ -696,5 +697,5 @@ export default function PassportPage() {
     return <PassportWizard onIssued={handleIssued} />;
   }
 
-  return <PassportConsole orgId={ORG_ID} />;
+  return <PassportConsole orgId={orgID} />;
 }

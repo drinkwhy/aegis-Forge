@@ -155,10 +155,24 @@ export default function BillingPage() {
       return;
     }
     setUpgradeLoading(true);
-    // Stripe checkout session — wire STRIPE_PUBLISHABLE_KEY + price IDs when ready
-    await new Promise((r) => setTimeout(r, 800));
-    alert('Stripe Checkout coming soon. Contact sales@aegiscruc.io to upgrade today.');
-    setUpgradeLoading(false);
+    try {
+      const res = await fetch('/api/v1/billing/checkout-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || 'Failed to initialize Stripe checkout session.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Network error initializing Stripe checkout session.');
+    } finally {
+      setUpgradeLoading(false);
+    }
   };
 
   return (

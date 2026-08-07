@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ShieldCheck, ShieldAlert, AlertTriangle, PauseCircle, Ban, RefreshCw, Search, ChevronRight, ExternalLink, Filter, Loader2 } from 'lucide-react';
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'd3b07384-d113-4a11-b541-ef81f212239e';
+import { useActiveOrganization } from '@/context/OrganizationContext';
+
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 const STATUS_CFG: Record<string, { color: string; icon: React.ElementType }> = {
@@ -15,12 +16,14 @@ const STATUS_CFG: Record<string, { color: string; icon: React.ElementType }> = {
 };
 
 export default function AdminPassportsPage() {
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const { data: passports, isLoading } = useSWR(
-    `/api/v1/organizations/${ORG_ID}/security-passports?_k=${refreshKey}`,
+    orgID ? `/api/v1/organizations/${orgID}/security-passports?_k=${refreshKey}` : null,
     fetcher, { refreshInterval: 30000 }
   );
 

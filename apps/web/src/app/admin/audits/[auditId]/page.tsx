@@ -154,7 +154,7 @@ export default function AdminAuditDetail({ params }: { params: Promise<{ auditId
                 <span style={{ fontSize: '12px', fontWeight: 600, flex: 1 }}>{String(r.test_definition_id)}</span>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{String(r.test_category).replace(/_/g, ' ')}</span>
                 <span style={{ fontSize: '10px', fontWeight: 700, color: r.severity === 'CRITICAL' ? '#ef4444' : r.severity === 'HIGH' ? '#f97316' : 'var(--text-muted)' }}>{String(r.severity)}</span>
-                {r.evidence_hash && (
+                {Boolean(r.evidence_hash) && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }} title={String(r.evidence_hash)}>
                     <Hash size={9} />{String(r.evidence_hash).slice(0, 8)}&hellip;
                   </span>
@@ -210,14 +210,14 @@ export default function AdminAuditDetail({ params }: { params: Promise<{ auditId
       )}
 
       {/* Passport Link */}
-      {order.passport_id && (
+      {Boolean(order.passport_id) && (
         <div className="glass-card" style={{ padding: '18px 22px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Shield size={18} color="#10b981" />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '13px', fontWeight: 700 }}>Security Passport Issued</div>
-            <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{order.passport_id}</div>
+            <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{String(order.passport_id)}</div>
           </div>
-          <Link href={`/verify/passport/${order.passport_id}`} target="_blank" style={{ fontSize: '12px', color: 'var(--primary)', textDecoration: 'none' }}>View &rarr;</Link>
+          <Link href={`/verify/passport/${String(order.passport_id)}`} target="_blank" style={{ fontSize: '12px', color: 'var(--primary)', textDecoration: 'none' }}>View &rarr;</Link>
         </div>
       )}
 
@@ -232,7 +232,7 @@ export default function AdminAuditDetail({ params }: { params: Promise<{ auditId
                   <span style={{ fontSize: '12px', fontWeight: 700 }}>{String(r.decision)}</span>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(String(r.reviewed_at)).toLocaleString()}</span>
                 </div>
-                {r.notes && <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>{String(r.notes)}</p>}
+                {Boolean(r.notes) && <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>{String(r.notes)}</p>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', fontSize: '10px', color: 'var(--text-muted)' }}>
                   <User size={9} /> {String(r.reviewer_user_id)}
                 </div>

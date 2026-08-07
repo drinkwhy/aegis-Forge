@@ -9,7 +9,8 @@ import {
   AlertOctagon, Cpu, Loader2, Clock, Shield,
 } from 'lucide-react';
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'd3b07384-d113-4a11-b541-ef81f212239e';
+import { useActiveOrganization } from '@/context/OrganizationContext';
+
 const fetcher = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); });
 
 interface PageProps { params: Promise<{ id: string }> }
@@ -38,15 +39,17 @@ const SEV_CFG: Record<string, string> = {
 
 export default function SystemProfile({ params }: PageProps) {
   const { id } = use(params);
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
   const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'passport'>('overview');
 
   const { data: system, isLoading, error, mutate } = useSWR(
-    `/api/v1/organizations/${ORG_ID}/systems/${id}`,
+    orgID ? `/api/v1/organizations/${orgID}/systems/${id}` : null,
     fetcher
   );
 
   const { data: events } = useSWR(
-    system ? `/api/v1/organizations/${ORG_ID}/systems/${id}/events` : null,
+    system && orgID ? `/api/v1/organizations/${orgID}/systems/${id}/events` : null,
     fetcher,
     { refreshInterval: 10000 }
   );

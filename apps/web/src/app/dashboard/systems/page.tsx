@@ -8,8 +8,8 @@ import {
   Cpu, Database, Server, Globe, Lock, TrendingUp,
   TrendingDown, Minus, Loader2, ExternalLink,
 } from 'lucide-react';
+import { useActiveOrganization } from '@/context/OrganizationContext';
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'd3b07384-d113-4a11-b541-ef81f212239e';
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 interface AISystem {
@@ -140,13 +140,15 @@ function RegisterSystemModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [form, setForm] = useState({ displayName: '', purpose: '', owner: '', modelProvider: '', modelName: '', environment: 'production' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.displayName) { setError('Display name is required'); return; }
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/organizations/${ORG_ID}/systems`, {
+      const res = await fetch(`/api/v1/organizations/${orgID}/systems`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, name: form.displayName.toLowerCase().replace(/\s+/g, '-') }),
@@ -224,12 +226,14 @@ function RegisterSystemModal({ onClose, onCreated }: { onClose: () => void; onCr
 }
 
 export default function SystemsPage() {
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
   const [search, setSearch] = useState('');
   const [riskFilter, setRiskFilter] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
 
   const { data, isLoading, mutate } = useSWR(
-    `/api/v1/organizations/${ORG_ID}/systems`,
+    orgID ? `/api/v1/organizations/${orgID}/systems` : null,
     fetcher,
     { refreshInterval: 30000 }
   );

@@ -58,7 +58,7 @@ export default function AdminAuditsPage() {
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
                     <div>{order.paid_at ? `Paid ${new Date(String(order.paid_at)).toLocaleDateString()}` : 'Unpaid'}</div>
-                    {order.execution_status && <div style={{ marginTop: '2px', color }}>{String(order.execution_status)}</div>}
+                    {Boolean(order.execution_status) && <div style={{ marginTop: '2px', color }}>{String(order.execution_status)}</div>}
                   </div>
                   <ChevronRight size={16} color="var(--text-muted)" />
                 </div>

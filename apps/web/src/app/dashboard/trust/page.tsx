@@ -8,7 +8,8 @@ import {
   Users, Cpu,
 } from 'lucide-react';
 
-const ORG_ID = process.env.NEXT_PUBLIC_ORG_ID || 'd3b07384-d113-4a11-b541-ef81f212239e';
+import { useActiveOrganization } from '@/context/OrganizationContext';
+
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 interface TrustSummary {
@@ -79,21 +80,24 @@ function TrustRing({ score, label }: { score: number; label: string }) {
 }
 
 export default function TrustDashboard() {
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
+
   const { data: summary, isLoading: summaryLoading, mutate } = useSWR<TrustSummary>(
-    `/api/v1/organizations/${ORG_ID}/trust-summary`,
+    orgID ? `/api/v1/organizations/${orgID}/trust-summary` : null,
     fetcher,
     { refreshInterval: 30000 }
   );
 
   const { data: systemsData } = useSWR(
-    `/api/v1/organizations/${ORG_ID}/systems`,
+    orgID ? `/api/v1/organizations/${orgID}/systems` : null,
     fetcher,
     { refreshInterval: 30000 }
   );
 
   const { data: findingsData } = useSWR('/api/v1/findings', fetcher);
   const { data: passportsData } = useSWR(
-    `/api/v1/organizations/${ORG_ID}/security-passports`,
+    orgID ? `/api/v1/organizations/${orgID}/security-passports` : null,
     fetcher
   );
 

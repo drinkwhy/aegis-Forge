@@ -2,10 +2,9 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { Wrench, CheckCircle, ExternalLink, X, Loader2, AlertTriangle } from 'lucide-react';
+import { useActiveOrganization } from '@/context/OrganizationContext';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-const WORKSPACE_ID = process.env.NEXT_PUBLIC_WORKSPACE_ID || 'd3b07384-d113-4a11-b541-ef81f212239d';
 
 interface Remediation {
   id: string;
@@ -18,7 +17,7 @@ interface Remediation {
     prompt?: string;
   };
   pr_url?: string;
-  status: 'proposed' | 'approved' | 'validated';
+  status: 'PENDING' | 'APPLIED' | 'REJECTED';
   proposed_at: string;
 }
 
@@ -29,7 +28,14 @@ const FIX_TYPE_LABEL: Record<string, string> = {
 };
 
 export default function RemediationsPage() {
-  const { data, error, isLoading, mutate } = useSWR('/api/v1/remediations', fetcher);
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
+  
+  const { data, error, isLoading, mutate } = useSWR(
+    orgID ? `/api/v1/organizations/${orgID}/remediations` : null, 
+    fetcher
+  );
+  
   const remediations: Remediation[] = data?.remediations || [];
 
   const [confirmTarget, setConfirmTarget] = useState<Remediation | null>(null);
@@ -40,7 +46,7 @@ export default function RemediationsPage() {
     if (!confirmTarget) return;
     setIsDeploying(true);
     try {
-      await fetch(`/api/v1/workspaces/${WORKSPACE_ID}/remediations/${confirmTarget.id}/approve`, {
+      await fetch(`/api/v1/organizations/${orgID}/remediations/${confirmTarget.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approved_by: 'admin', note: 'Approved via Aegis Crucible console' }),
@@ -81,7 +87,7 @@ export default function RemediationsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {remediations.map((rem) => {
-            const isDeployed = deployedIds.has(rem.id) || rem.status === 'approved' || rem.status === 'validated';
+            const isDeployed = deployedIds.has(rem.id) || rem.status === 'APPLIED';
             return (
               <div key={rem.id} className="glass animate-fade-in" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1 }}>

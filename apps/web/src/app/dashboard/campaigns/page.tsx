@@ -4,6 +4,7 @@ import useSWR from 'swr';
 import { Play, Plus, X, Loader2, Zap, Lock, AlertTriangle } from 'lucide-react';
 import { SeverityBadge } from '@/components/ui/SeverityBadge';
 import Link from 'next/link';
+import { useActiveOrganization } from '@/context/OrganizationContext';
 
 const CURRENT_PLAN = 'starter'; // Replace with real plan from auth context
 const CAMPAIGN_LIMIT = 3;
@@ -23,6 +24,8 @@ interface Campaign {
 }
 
 export default function CampaignsPage() {
+  const { organizationId } = useActiveOrganization();
+  const orgID = organizationId || '';
   const [isPanelOpen, setPanelOpen] = useState(false);
   const [filter, setFilter] = useState('All');
   const [runningId, setRunningId] = useState<string | null>(null);
@@ -41,8 +44,7 @@ export default function CampaignsPage() {
     if (atLimit) return;
     setRunningId(campaignId);
     try {
-      const workspaceId = process.env.NEXT_PUBLIC_WORKSPACE_ID || 'd3b07384-d113-4a11-b541-ef81f212239d';
-      await fetch(`/api/v1/workspaces/${workspaceId}/campaigns/${campaignId}/run`, {
+      await fetch(`/api/v1/organizations/${orgID}/campaigns/${campaignId}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

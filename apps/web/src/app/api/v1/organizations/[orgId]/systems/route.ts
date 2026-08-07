@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSql } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 // Ensure ai_systems table exists
 const ENSURE_TABLE = `
   CREATE TABLE IF NOT EXISTS ai_systems (

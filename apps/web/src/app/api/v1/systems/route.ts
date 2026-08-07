@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSql } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 const ENSURE_TABLE = `
   CREATE TABLE IF NOT EXISTS ai_systems (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

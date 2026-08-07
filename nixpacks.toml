@@ -8,7 +8,7 @@ cmds = ["npm install -g pnpm@9.15.4"]
 cmds = ["pnpm install --no-frozen-lockfile"]
 
 [phases.build]
-cmds = ["pnpm --filter @aegis/web build"]
+cmds = ["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_Zmx1ZW50LXN3YW4tOTYuY2xlcmsuYWNjb3VudHMuZGV2JA pnpm --filter @aegis/web build"]
 
 [start]
 cmd = "pnpm --filter @aegis/web start"

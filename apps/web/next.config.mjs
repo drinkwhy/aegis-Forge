@@ -13,7 +13,7 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    const targetUrl = process.env.CONTROL_PLANE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || (process.env.NODE_ENV === 'production' ? 'http://control-plane.railway.internal:8080' : '');
+    const targetUrl = process.env.CONTROL_PLANE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || '';
     if (!targetUrl || targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1')) {
       return [];
     }

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_YnVpbGQtdGltZS1kdW1teS1jbGVyay1rZXktMDBhLmNsZXJrLmFjY291bnRzLmRldiQ';
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_Zmx1ZW50LXN3YW4tOTYuY2xlcmsuYWNjb3VudHMuZGV2JA';
   return (
     <ClerkProvider publishableKey={publishableKey} appearance={{ baseTheme: dark }}>
       <html lang="en">

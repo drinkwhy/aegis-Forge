@@ -26,7 +26,7 @@ RUN pnpm --filter @aegis/web build
 
 FROM base AS runner
 
-WORKDIR /app
+WORKDIR /app/apps/web
 
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
@@ -38,4 +38,4 @@ COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 8080
 
-CMD ["node", "apps/web/server.js"]
+CMD ["node", "server.js"]

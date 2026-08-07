@@ -16,13 +16,11 @@ export const metadata: Metadata = {
 
 import { OrganizationProvider } from '@/context/OrganizationContext';
 
+const ACTIVE_CLERK_KEY = 'pk_test_Zmx1ZW50LXN3YW4tOTYuY2xlcmsuYWNjb3VudHMuZGV2JA';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  let publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_Zmx1ZW50LXN3YW4tOTYuY2xlcmsuYWNjb3VudHMuZGV2JA';
-  if (!publishableKey || publishableKey.includes('certain-vervet')) {
-    publishableKey = 'pk_test_Zmx1ZW50LXN3YW4tOTYuY2xlcmsuYWNjb3VudHMuZGV2JA';
-  }
   return (
-    <ClerkProvider publishableKey={publishableKey} appearance={{ baseTheme: dark }}>
+    <ClerkProvider publishableKey={ACTIVE_CLERK_KEY} appearance={{ baseTheme: dark }}>
       <OrganizationProvider>
         <html lang="en">
           <body>{children}</body>

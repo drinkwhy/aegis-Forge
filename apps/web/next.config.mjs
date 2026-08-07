@@ -13,16 +13,18 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return {
-      beforeFiles: [],
-      afterFiles: [
-        {
-          source: '/api/v1/:path*',
-          destination: `${controlPlaneOrigin}/api/v1/:path*`,
-        },
-      ],
-      fallback: [],
-    };
+    const rawApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+    const isExternal = rawApiUrl && !rawApiUrl.includes('localhost') && !rawApiUrl.includes('127.0.0.1');
+    if (!isExternal) {
+      return [];
+    }
+    const origin = rawApiUrl.replace(/\/api\/v1\/?$/, '');
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${origin}/api/v1/:path*`,
+      },
+    ];
   },
 };
 

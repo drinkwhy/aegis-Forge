@@ -1,8 +1,11 @@
+import path from 'path';
+
 /** @type {import('next').NextConfig} */
 const controlPlaneOrigin = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080').replace(/\/api\/v1\/?$/, '');
 
 const nextConfig = {
   output: 'standalone',
+  outputFileTracingRoot: path.join(process.cwd(), '../../'),
   async redirects() {
     return [
       {

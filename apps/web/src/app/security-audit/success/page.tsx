@@ -1,10 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle, Shield, Loader2, ArrowRight, Clock } from 'lucide-react';
 
-export default function SuccessPage() {
+export const dynamic = 'force-dynamic';
+
+function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderId = searchParams.get('order_id');
@@ -91,5 +93,17 @@ export default function SuccessPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Loader2 size={32} color="var(--primary)" className="animate-spin" />
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
   );
 }

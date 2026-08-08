@@ -1,6 +1,5 @@
 # Stage 1: Builder
-# Railway builds from the repo root, so paths are relative to repo root
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
 # Copy only the worker module files first for caching

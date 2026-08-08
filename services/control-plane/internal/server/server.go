@@ -132,8 +132,21 @@ func (s *Server) setupRoutes() {
 		r.Post("/verify/passports/{passportId}", s.passportHandler.CreateVerificationToken)
 		r.Get("/verify/passports/{passportId}", s.passportHandler.VerifyPassport)
 
+		// Organizations Top-Level
+		r.Get("/organizations", s.listOrganizations)
+		r.Post("/organizations", s.createOrganization)
+
+		// Audit Orders Top-Level
+		r.Post("/audit-orders", s.createAuditOrder)
+		r.Patch("/audit-orders/{orderId}", s.updateAuditOrder)
+
+		// Billing Top-Level
+		r.Post("/billing/checkout-sessions", s.createCheckoutSession)
+
 		// Organization/System Passport Endpoints
 		r.Route("/organizations/{organizationId}", func(r chi.Router) {
+			r.Post("/assets", s.createAsset)
+
 			r.Post("/systems/{systemId}/snapshots", s.passportHandler.CreateSnapshot)
 			r.Post("/systems/{systemId}/heartbeat", s.passportHandler.RecordHeartbeat)
 

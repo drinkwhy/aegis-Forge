@@ -46,6 +46,15 @@ class Evaluator:
         max_confidence = max([r.confidence for r in results if r.detected] + [0.0])
         requires_human_review = any(r.requires_human_review for r in results if r.detected)
         
+        calculated_risk = None
+        if attack_successful:
+            calculated_risk = {
+                "overall_risk": "HIGH",
+                "business_risk": "HIGH",
+                "technical_risk": "CRITICAL",
+                "recommended_priority": "P1"
+            }
+        
         return EvaluationResponse(
             run_id=request.run_id,
             attack_successful=attack_successful,
@@ -53,5 +62,6 @@ class Evaluator:
             detectors_run=results,
             requires_human_review=requires_human_review,
             human_review_reason="Semantic detector flagged behavior" if requires_human_review else None,
-            fair_preliminary={"vulnerability_class": "TBD", "agent_exposure": "internal_restricted"} # placeholder
+            fair_preliminary={"vulnerability_class": "TBD", "agent_exposure": "internal_restricted"}, # placeholder
+            calculated_risk=calculated_risk
         )

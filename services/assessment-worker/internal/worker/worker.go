@@ -20,7 +20,7 @@ const QueueKey = "assessment:queue"
 // AssessmentJob is the payload published to Redis
 type AssessmentJob struct {
 	ExecutionID    string `json:"executionId"`
-	AuditOrderID   string `json:"auditOrderId"`
+	AuditCaseID    string `json:"auditCaseId"`
 	OrganizationID string `json:"organizationId"`
 	TargetID       string `json:"targetId"`
 }
@@ -63,7 +63,7 @@ func (w *Worker) Run(ctx context.Context) {
 				continue
 			}
 
-			log.Info().Str("execution_id", job.ExecutionID).Str("order_id", job.AuditOrderID).Msg("Processing assessment job")
+			log.Info().Str("execution_id", job.ExecutionID).Str("case_id", job.AuditCaseID).Msg("Processing assessment job")
 			if err := w.processJob(ctx, &job); err != nil {
 				log.Error().Err(err).Str("execution_id", job.ExecutionID).Msg("Job failed")
 			}
@@ -72,14 +72,14 @@ func (w *Worker) Run(ctx context.Context) {
 }
 
 func (w *Worker) processJob(ctx context.Context, job *AssessmentJob) error {
-	// 1. Verify payment
-	var orderStatus string
-	err := w.db.QueryRow(ctx, `SELECT status FROM audit_orders WHERE id = $1`, job.AuditOrderID).Scan(&orderStatus)
+	// 1. Verify case
+	var caseStatus string
+	err := w.db.QueryRow(ctx, `SELECT status FROM audit_cases WHERE id = $1`, job.AuditCaseID).Scan(&caseStatus)
 	if err != nil {
-		return w.failExecution(ctx, job.ExecutionID, "audit order not found: "+err.Error())
+		return w.failExecution(ctx, job.ExecutionID, "audit case not found: "+err.Error())
 	}
-	if orderStatus != "PAID" && orderStatus != "READY" && orderStatus != "ASSESSMENT_RUNNING" {
-		return w.failExecution(ctx, job.ExecutionID, fmt.Sprintf("order not paid, status=%s", orderStatus))
+	if caseStatus != "READY_FOR_ASSESSMENT" && caseStatus != "ASSESSMENT_RUNNING" {
+		return w.failExecution(ctx, job.ExecutionID, fmt.Sprintf("case not ready, status=%s", caseStatus))
 	}
 
 	// 2. Load RoE and validate
@@ -95,9 +95,9 @@ func (w *Worker) processJob(ctx context.Context, job *AssessmentJob) error {
 	err = w.db.QueryRow(ctx, `
 		SELECT id, status, permitted_tests, testing_window_start, testing_window_end, rate_limit
 		FROM rules_of_engagement
-		WHERE audit_order_id = $1 AND status = 'ACTIVE'
+		WHERE audit_case_id = $1 AND status = 'ACTIVE'
 		LIMIT 1
-	`, job.AuditOrderID).Scan(
+	`, job.AuditCaseID).Scan(
 		&roe.ID, &roe.Status, &roe.PermittedTests,
 		&roe.TestingWindowStart, &roe.TestingWindowEnd, &roe.RateLimit,
 	)
@@ -118,9 +118,9 @@ func (w *Worker) processJob(ctx context.Context, job *AssessmentJob) error {
 	var targetEndpoint, targetType string
 	err = w.db.QueryRow(ctx, `
 		SELECT endpoint, target_type FROM audit_targets
-		WHERE audit_order_id = $1
+		WHERE audit_case_id = $1
 		LIMIT 1
-	`, job.AuditOrderID).Scan(&targetEndpoint, &targetType)
+	`, job.AuditCaseID).Scan(&targetEndpoint, &targetType)
 	if err != nil {
 		return w.failExecution(ctx, job.ExecutionID, "target not found: "+err.Error())
 	}
@@ -135,8 +135,8 @@ func (w *Worker) processJob(ctx context.Context, job *AssessmentJob) error {
 		return fmt.Errorf("failed to mark execution running: %w", err)
 	}
 	_, _ = w.db.Exec(ctx, `
-		UPDATE audit_orders SET status = 'ASSESSMENT_RUNNING', updated_at = NOW() WHERE id = $1
-	`, job.AuditOrderID)
+		UPDATE audit_cases SET status = 'ASSESSMENT_RUNNING', updated_at = NOW() WHERE id = $1
+	`, job.AuditCaseID)
 
 	// 5. Load test definitions from corpus
 	testDefs, err := corpus.LoadForCategories(w.cfg.CorpusPath, roe.PermittedTests)
@@ -218,14 +218,14 @@ func (w *Worker) processJob(ctx context.Context, job *AssessmentJob) error {
 		if !result.Passed && result.Status == "FAIL" {
 			failedCount++
 			_, err = w.db.Exec(ctx, `
-				INSERT INTO findings (tenant_id, workspace_id, campaign_id, title, vulnerability_class, owasp_category, severity, status, evidence)
+				INSERT INTO findings (tenant_id, workspace_id, audit_case_id, title, vulnerability_class, owasp_category, severity, status, evidence)
 				SELECT
 					'00000000-0000-0000-0000-000000000000',
 					'00000000-0000-0000-0000-000000000000',
-					'00000000-0000-0000-0000-000000000000',
-					$1, $2, $3, $4, 'open',
-					jsonb_build_object('executionId', $5, 'testResultEvidenceHash', $6, 'testDefinitionId', $7)
-			`, fmt.Sprintf("%s detected — %s", def.AttackClass, def.ID),
+					$1,
+					$2, $3, $4, $5, 'open',
+					jsonb_build_object('executionId', $6, 'testResultEvidenceHash', $7, 'testDefinitionId', $8)
+			`, job.AuditCaseID, fmt.Sprintf("%s detected — %s", def.AttackClass, def.ID),
 				def.AttackClass, def.OWASPMapping, def.Severity,
 				job.ExecutionID, evidenceHash, def.ID)
 			if err != nil {
@@ -266,17 +266,17 @@ func (w *Worker) processJob(ctx context.Context, job *AssessmentJob) error {
 		log.Error().Err(err).Msg("Failed to mark execution complete")
 	}
 
-	// 11. Update order to REVIEW_REQUIRED
+	// 11. Update case to ANALYZING_RESULTS
 	_, _ = w.db.Exec(ctx, `
-		UPDATE audit_orders SET status = 'REVIEW_REQUIRED', updated_at = NOW() WHERE id = $1
-	`, job.AuditOrderID)
+		UPDATE audit_cases SET status = 'ANALYZING_RESULTS', updated_at = NOW() WHERE id = $1
+	`, job.AuditCaseID)
 
 	// Insert audit event
 	_, _ = w.db.Exec(ctx, `
-		INSERT INTO audit_events (organization_id, audit_order_id, event_type, actor_type, payload)
+		INSERT INTO audit_events (organization_id, audit_case_id, event_type, actor_type, payload)
 		VALUES ($1, $2, 'ASSESSMENT_COMPLETE', 'worker',
 		  jsonb_build_object('executionId', $3, 'totalTests', $4, 'failedTests', $5, 'workerId', $6))
-	`, job.OrganizationID, job.AuditOrderID, job.ExecutionID, completedCount, failedCount, w.cfg.WorkerID)
+	`, job.OrganizationID, job.AuditCaseID, job.ExecutionID, completedCount, failedCount, w.cfg.WorkerID)
 
 	log.Info().
 		Str("execution_id", job.ExecutionID).

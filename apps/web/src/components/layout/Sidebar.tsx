@@ -20,15 +20,9 @@ import {
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'AI Trust Registry', href: '/dashboard/systems', icon: Cpu },
-  { name: 'Trust Dashboard', href: '/dashboard/trust', icon: BarChart3 },
-  { name: '3D Anatomy', href: '/dashboard/anatomy', icon: Activity },
-  { name: 'Security Passport', href: '/dashboard/passport', icon: ShieldCheck },
-  { name: 'Campaigns', href: '/dashboard/campaigns', icon: Play },
+  { name: 'Current Audit', href: '/dashboard/audit', icon: Activity },
   { name: 'Findings', href: '/dashboard/findings', icon: ShieldAlert },
-  { name: 'Assets', href: '/dashboard/assets', icon: Network },
-  { name: 'Remediations', href: '/dashboard/remediations', icon: Wrench },
-  { name: 'Reports', href: '/dashboard/reports', icon: FileText },
+  { name: 'Security Passport', href: '/dashboard/passport', icon: ShieldCheck },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 

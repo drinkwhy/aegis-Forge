@@ -41,6 +41,7 @@ export const campaigns = pgTable("campaigns", {
 export const findings = pgTable("findings", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id),
   campaignId: uuid("campaign_id").notNull().references(() => campaigns.id),
   title: text("title").notNull(),
@@ -63,6 +64,7 @@ export const subjectSnapshots = pgTable("subject_snapshots", {
 export const evidenceArtifacts = pgTable("evidence_artifacts", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   evidenceType: text("evidence_type").notNull(),
   subjectType: text("subject_type").notNull(),
   subjectId: text("subject_id").notNull(),
@@ -118,9 +120,22 @@ export const validationResults = pgTable("validation_results", {
 export const controlEvaluations = pgTable("control_evaluations", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").references(() => assets.id, { onDelete: "cascade" }),
+  frameworkId: text("framework_id").notNull(),
+  frameworkVersion: text("framework_version").notNull(),
   controlId: text("control_id").notNull(),
-  status: text("status").notNull(),
+  status: text("status").notNull(), // PASS, PARTIAL, FAIL, NOT_APPLICABLE, NEEDS_EVIDENCE, EXCEPTION_REQUESTED, EXCEPTION_APPROVED, EXCEPTION_REJECTED
+  evidenceIds: uuid("evidence_ids").array().default([]).notNull(),
+  assessmentResultIds: uuid("assessment_result_ids").array().default([]).notNull(),
+  findingIds: uuid("finding_ids").array().default([]).notNull(),
+  confidence: numeric("confidence"),
+  evaluatorVersion: text("evaluator_version"),
+  explanation: text("explanation"),
+  remediationGuidance: text("remediation_guidance"),
   lastEvaluatedAt: timestamp("last_evaluated_at").defaultNow().notNull(),
+  nextEvaluationAt: timestamp("next_evaluation_at"),
+  reviewerStatus: text("reviewer_status"),
 });
 
 // Finding Dispositions
@@ -141,6 +156,7 @@ export const findingDispositions = pgTable("finding_dispositions", {
 export const assuranceEvaluations = pgTable("assurance_evaluations", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   frameworkVersionId: text("framework_version_id").notNull(),
   subjectSnapshotId: uuid("subject_snapshot_id").notNull().references(() => subjectSnapshots.id, { onDelete: "restrict" }),
   evaluatedAt: timestamp("evaluated_at").defaultNow().notNull(),
@@ -165,6 +181,7 @@ export const securityPassports = pgTable("security_passports", {
   passportId: uuid("passport_id").defaultRandom().primaryKey(),
   passportVersion: text("passport_version").default("1.0").notNull(),
   organizationId: uuid("organization_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   systemId: text("system_id").notNull(),
   systemDisplayName: text("system_display_name").notNull(),
   frameworkId: text("framework_id").notNull(),
@@ -238,6 +255,15 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const auditCases = pgTable("audit_cases", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  status: text("status").default("DRAFT").notNull(),
+  readinessScore: numeric("readiness_score"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const organizationMembers = pgTable("organization_members", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
@@ -249,6 +275,7 @@ export const organizationMembers = pgTable("organization_members", {
 export const assets = pgTable("assets", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   ownerUserId: text("owner_user_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -260,6 +287,7 @@ export const assets = pgTable("assets", {
 export const auditOrders = pgTable("audit_orders", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   purchaserUserId: text("purchaser_user_id").notNull(),
   assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "restrict" }),
   productCode: text("product_code").default("AEGIS_VERIFIED_LAUNCH_ASSESSMENT").notNull(),
@@ -277,6 +305,7 @@ export const auditOrders = pgTable("audit_orders", {
 export const auditTargets = pgTable("audit_targets", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   auditOrderId: uuid("audit_order_id").notNull().references(() => auditOrders.id, { onDelete: "restrict" }),
   assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "restrict" }),
   targetType: text("target_type").notNull(), // 'openai_compatible', 'mcp_server'
@@ -291,6 +320,7 @@ export const auditTargets = pgTable("audit_targets", {
 export const rulesOfEngagement = pgTable("rules_of_engagement", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   auditOrderId: uuid("audit_order_id").notNull().references(() => auditOrders.id, { onDelete: "restrict" }),
   targetId: uuid("target_id").notNull().references(() => auditTargets.id, { onDelete: "restrict" }),
   authorizedDomains: text("authorized_domains").array().notNull().default([]),
@@ -312,6 +342,7 @@ export const rulesOfEngagement = pgTable("rules_of_engagement", {
 export const assessmentExecutions = pgTable("assessment_executions", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   auditOrderId: uuid("audit_order_id").notNull().references(() => auditOrders.id, { onDelete: "restrict" }),
   targetId: uuid("target_id").notNull().references(() => auditTargets.id, { onDelete: "restrict" }),
   status: text("status").default("QUEUED").notNull(), // 'QUEUED','RUNNING','COMPLETE','FAILED','CANCELED'
@@ -330,6 +361,7 @@ export const assessmentExecutions = pgTable("assessment_executions", {
 export const assessmentTestResults = pgTable("assessment_test_results", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   executionId: uuid("execution_id").notNull().references(() => assessmentExecutions.id, { onDelete: "cascade" }),
   testDefinitionId: text("test_definition_id").notNull(),
   testCategory: text("test_category").notNull(),
@@ -347,6 +379,7 @@ export const assessmentTestResults = pgTable("assessment_test_results", {
 export const auditReviews = pgTable("audit_reviews", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   auditOrderId: uuid("audit_order_id").notNull().references(() => auditOrders.id, { onDelete: "restrict" }),
   reviewerUserId: text("reviewer_user_id").notNull(),
   decision: text("decision").notNull(), // 'APPROVED','REJECTED','REMEDIATION_REQUIRED','RETEST_REQUIRED'
@@ -357,6 +390,7 @@ export const auditReviews = pgTable("audit_reviews", {
 export const auditEvents = pgTable("audit_events", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "cascade" }),
   auditOrderId: uuid("audit_order_id").references(() => auditOrders.id, { onDelete: "set null" }),
   eventType: text("event_type").notNull(),
   actorUserId: text("actor_user_id"),
@@ -376,6 +410,206 @@ export const userRoles = pgTable("user_roles", {
   id: uuid("id").defaultRandom().primaryKey(),
   clerkUserId: text("clerk_user_id").unique().notNull(),
   role: text("role").default("customer").notNull(), // 'customer','reviewer','admin'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Compliance Engine
+
+export const frameworks = pgTable("frameworks", {
+  id: text("id").primaryKey(), // e.g., 'eu_ai_act', 'iso_42001'
+  name: text("name").notNull(),
+  version: text("version").notNull(),
+  jurisdiction: text("jurisdiction"),
+  publisher: text("publisher").notNull(),
+  type: text("type").notNull(),
+  effectiveDate: timestamp("effective_date"),
+  deprecatedAt: timestamp("deprecated_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const frameworkControls = pgTable("framework_controls", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  frameworkId: text("framework_id").notNull().references(() => frameworks.id, { onDelete: "cascade" }),
+  frameworkVersion: text("framework_version").notNull(),
+  controlCode: text("control_code").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  controlType: text("control_type").notNull(),
+  severity: text("severity").notNull(),
+  requiredEvidenceTypes: text("required_evidence_types").array().default([]).notNull(),
+  requiredTestCategories: text("required_test_categories").array().default([]).notNull(),
+  guidance: text("guidance"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const complianceProfiles = pgTable("compliance_profiles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").unique().notNull().references(() => auditCases.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  jurisdictions: text("jurisdictions").array().default([]).notNull(),
+  organizationType: text("organization_type"),
+  aiSystemPurpose: text("ai_system_purpose"),
+  aiClassification: text("ai_classification"),
+  dataTypes: text("data_types").array().default([]).notNull(),
+  deploymentLocations: text("deployment_locations").array().default([]).notNull(),
+  modelProvider: text("model_provider"),
+  customerSelections: jsonb("customer_selections").default({}).notNull(),
+  applicableFrameworks: text("applicable_frameworks").array().default([]).notNull(),
+  frameworkVersions: jsonb("framework_versions").default({}).notNull(),
+  assessmentTimestamp: timestamp("assessment_timestamp").defaultNow().notNull(),
+  reviewerState: text("reviewer_state").default("PENDING").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const assessmentPlans = pgTable("assessment_plans", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  auditCaseId: uuid("audit_case_id").unique().notNull().references(() => auditCases.id, { onDelete: "cascade" }),
+  requiredTests: text("required_tests").array().default([]).notNull(),
+  optionalTests: text("optional_tests").array().default([]).notNull(),
+  prohibitedTests: text("prohibited_tests").array().default([]).notNull(),
+  expectedControlCoverage: text("expected_control_coverage").array().default([]).notNull(),
+  expectedEvidence: text("expected_evidence").array().default([]).notNull(),
+  estimatedDurationMs: integer("estimated_duration_ms"),
+  testBudget: integer("test_budget"),
+  rateLimits: jsonb("rate_limits").default({}).notNull(),
+  testSequencing: jsonb("test_sequencing").default([]).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const complianceFindings = pgTable("compliance_findings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").notNull().references(() => auditCases.id, { onDelete: "cascade" }),
+  frameworkId: text("framework_id").notNull(),
+  controlId: text("control_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  severity: text("severity").notNull(),
+  evidenceRequired: text("evidence_required"),
+  remediation: text("remediation"),
+  ownerUserId: text("owner_user_id"),
+  dueDate: timestamp("due_date"),
+  status: text("status").default("OPEN").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const certificationPreparations = pgTable("certification_preparations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").notNull().references(() => auditCases.id, { onDelete: "cascade" }),
+  status: text("status").default("GENERATING").notNull(),
+  exportedData: jsonb("exported_data").default({}).notNull(),
+  downloadUrl: text("download_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const externalCertifications = pgTable("external_certifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  issuer: text("issuer").notNull(),
+  certificationType: text("certification_type").notNull(),
+  certificationNumber: text("certification_number"),
+  issuedAt: timestamp("issued_at").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  verificationUrl: text("verification_url"),
+  evidenceHash: text("evidence_hash"),
+  verificationStatus: text("verification_status").default("PENDING").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// AegisAgent Runtime Protection
+
+export const runtimeAgents = pgTable("runtime_agents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "set null" }),
+  agentVersion: text("agent_version").notNull(),
+  sdkVersion: text("sdk_version").notNull(),
+  runtimeType: text("runtime_type").notNull(), // 'SDK', 'PROXY', 'MCP_GATEWAY', 'ENTERPRISE'
+  environment: text("environment").notNull(),
+  installationMethod: text("installation_method").notNull(),
+  status: text("status").default("REGISTERING").notNull(), // 'REGISTERING', 'CONNECTED', 'HEALTHY', 'DEGRADED', 'OFFLINE', 'REVOKED', 'UPDATE_REQUIRED'
+  policyBundleVersion: text("policy_bundle_version"),
+  lastHeartbeatAt: timestamp("last_heartbeat_at"),
+  registeredAt: timestamp("registered_at").defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const runtimeEvents = pgTable("runtime_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "set null" }),
+  runtimeAgentId: uuid("runtime_agent_id").notNull().references(() => runtimeAgents.id, { onDelete: "cascade" }),
+  sessionId: text("session_id"),
+  traceId: text("trace_id"),
+  eventType: text("event_type").notNull(), // e.g. 'tool.requested', 'behavior.anomaly'
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  actor: text("actor"),
+  action: text("action"),
+  target: text("target"),
+  toolName: text("tool_name"),
+  model: text("model"),
+  policyDecision: text("policy_decision"), // 'ALLOW', 'DENY', 'REQUIRE_APPROVAL', 'WARN'
+  riskLevel: text("risk_level"),
+  metadata: jsonb("metadata").default({}).notNull(),
+  evidenceHash: text("evidence_hash"),
+});
+
+export const runtimePolicies = pgTable("runtime_policies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  mode: text("mode").default("OBSERVE").notNull(), // 'DRAFT', 'SIMULATION', 'OBSERVE', 'ENFORCE'
+  allowedTools: text("allowed_tools").array().default([]).notNull(),
+  prohibitedTools: text("prohibited_tools").array().default([]).notNull(),
+  approvedDomains: text("approved_domains").array().default([]).notNull(),
+  humanApprovalRequirements: jsonb("human_approval_requirements").default({}).notNull(),
+  rateLimits: jsonb("rate_limits").default({}).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const controlRecommendations = pgTable("control_recommendations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  findingId: uuid("finding_id").notNull().references(() => findings.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").notNull().references(() => auditCases.id, { onDelete: "cascade" }),
+  controlType: text("control_type").notNull(), // 'TOOL_RESTRICTION', 'DOMAIN_BLOCK'
+  policyTemplate: jsonb("policy_template").notNull(),
+  reason: text("reason").notNull(),
+  expectedProtection: text("expected_protection").notNull(),
+  confidence: numeric("confidence"),
+  generatedBy: text("generated_by").notNull(),
+  reviewerStatus: text("reviewer_status").default("PENDING").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const behaviorProfiles = pgTable("behavior_profiles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").unique().notNull().references(() => assets.id, { onDelete: "cascade" }),
+  baselineDimensions: jsonb("baseline_dimensions").default({}).notNull(), // common tools, average session length, models
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+});
+
+export const securityIncidents = pgTable("security_incidents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => assets.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  severity: text("severity").notNull(), // 'CRITICAL', 'HIGH', etc.
+  status: text("status").default("OPEN").notNull(),
+  relatedEventIds: uuid("related_event_ids").array().default([]).notNull(),
+  responseActions: jsonb("response_actions").default([]).notNull(),
+  passportImpact: text("passport_impact"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

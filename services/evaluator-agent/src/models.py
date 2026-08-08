@@ -26,3 +26,4 @@ class EvaluationResponse(BaseModel):
     requires_human_review: bool
     human_review_reason: str | None
     fair_preliminary: dict  # Preliminary FAIR-AI score inputs
+    calculated_risk: dict | None = None

@@ -74,7 +74,8 @@ export const evidenceArtifacts = pgTable("evidence_artifacts", {
   validFrom: timestamp("valid_from").notNull(),
   expiresAt: timestamp("expires_at"),
   contentHash: text("content_hash").notNull(),
-  storageUri: text("storage_uri").notNull(),
+  hashAlgorithm: text("hash_algorithm").default("SHA-256").notNull(),
+  storageUri: text("storage_uri").notNull(), // should be encrypted object storage URI
   schemaVersion: text("schema_version").notNull(),
   collectorIdentity: text("collector_identity").notNull(),
   reviewerIdentity: text("reviewer_identity"),
@@ -83,6 +84,10 @@ export const evidenceArtifacts = pgTable("evidence_artifacts", {
   frameworkVersionId: text("framework_version_id").notNull(),
   requirementId: text("requirement_id").notNull(),
   integrityStatus: text("integrity_status").default("UNKNOWN").notNull(),
+  classification: text("classification").default("SECURITY_EVIDENCE").notNull(),
+  retentionPolicyId: text("retention_policy_id"),
+  deletionState: text("deletion_state").default("ACTIVE").notNull(), // 'ACTIVE', 'ARCHIVED', 'DELETED'
+  residencyRegion: text("residency_region").default("US").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -610,6 +615,104 @@ export const securityIncidents = pgTable("security_incidents", {
   relatedEventIds: uuid("related_event_ids").array().default([]).notNull(),
   responseActions: jsonb("response_actions").default([]).notNull(),
   passportImpact: text("passport_impact"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Data Governance & Assurance Layer
+
+export const cryptographicAuditEvents = pgTable("cryptographic_audit_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  eventId: text("event_id").notNull(), // Correlation back to source event if needed
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  auditCaseId: uuid("audit_case_id").references(() => auditCases.id, { onDelete: "set null" }),
+  assetId: uuid("asset_id").references(() => assets.id, { onDelete: "set null" }),
+  actor: text("actor").notNull(),
+  action: text("action").notNull(),
+  resource: text("resource").notNull(),
+  decision: text("decision").notNull(),
+  correlationId: text("correlation_id"),
+  payloadHash: text("payload_hash").notNull(),
+  previousEventHash: text("previous_event_hash"),
+  currentEventHash: text("current_event_hash").unique().notNull(),
+  signingKeyId: uuid("signing_key_id").references(() => signingKeyReferences.id, { onDelete: "restrict" }),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+export const retentionPolicies = pgTable("retention_policies", {
+  id: text("id").primaryKey(), // e.g. 'runtime_metadata_90d'
+  name: text("name").notNull(),
+  dataClass: text("data_class").notNull(),
+  purpose: text("purpose").notNull(),
+  retentionDurationDays: integer("retention_duration_days").notNull(),
+  frameworkBasis: text("framework_basis"),
+  jurisdiction: text("jurisdiction"),
+  deletionBehavior: text("deletion_behavior").default("HARD_DELETE").notNull(), // 'HARD_DELETE', 'ARCHIVE'
+  archivalBehavior: text("archival_behavior"),
+  version: text("version").default("1.0").notNull(),
+  effectiveDate: timestamp("effective_date").defaultNow().notNull(),
+});
+
+export const deletionReceipts = pgTable("deletion_receipts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id").notNull(),
+  hash: text("hash").notNull(),
+  policyId: text("policy_id").notNull().references(() => retentionPolicies.id),
+  deletedAt: timestamp("deleted_at").defaultNow().notNull(),
+  actor: text("actor").default("SYSTEM").notNull(),
+  result: text("result").default("SUCCESS").notNull(),
+});
+
+export const legalHolds = pgTable("legal_holds", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  scope: text("scope").notNull(), // e.g. 'audit_case_123', 'all_evidence'
+  reason: text("reason").notNull(),
+  createdBy: text("created_by").notNull(),
+  approvedBy: text("approved_by").notNull(),
+  startAt: timestamp("start_at").defaultNow().notNull(),
+  endAt: timestamp("end_at"),
+  status: text("status").default("ACTIVE").notNull(), // 'ACTIVE', 'RELEASED'
+});
+
+export const processingActivities = pgTable("processing_activities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  system: text("system").notNull(),
+  purpose: text("purpose").notNull(),
+  dataCategories: text("data_categories").array().default([]).notNull(),
+  source: text("source").notNull(),
+  destination: text("destination").notNull(),
+  processorName: text("processor_name").notNull(),
+  region: text("region").notNull(),
+  dpaStatus: text("dpa_status").default("UNKNOWN").notNull(), // 'SIGNED', 'PENDING', 'UNKNOWN'
+  retention: text("retention"),
+  securityControls: text("security_controls").array().default([]).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  effectiveDate: timestamp("effective_date").defaultNow().notNull(),
+});
+
+export const dataRegions = pgTable("data_regions", {
+  id: text("id").primaryKey(), // 'US', 'EU', 'CUSTOMER_MANAGED'
+  description: text("description").notNull(),
+  isCompliantFor: text("is_compliant_for").array().default([]).notNull(), // e.g. ['GDPR', 'CCPA']
+});
+
+export const credentialReferences = pgTable("credential_references", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  targetHost: text("target_host").notNull(),
+  credentialType: text("credential_type").notNull(), // 'api_key', 'oauth_token', etc.
+  encryptedSecretReference: text("encrypted_secret_reference").notNull(), // Envelope encrypted
+  keyId: text("key_id").notNull(), // ID of the KMS/Vault key used
+  keyVersion: text("key_version").notNull(),
+  encryptionAlgorithm: text("encryption_algorithm").default("AES-GCM").notNull(),
+  allowedMethods: text("allowed_methods").array().default([]).notNull(),
+  allowedScopes: text("allowed_scopes").array().default([]).notNull(),
+  rotationMetadata: jsonb("rotation_metadata").default({}).notNull(),
+  lastUsedAt: timestamp("last_used_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

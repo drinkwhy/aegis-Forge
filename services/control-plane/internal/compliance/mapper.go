@@ -71,3 +71,45 @@ func (e *ControlEvaluationEngine) Evaluate(ctx context.Context, auditCaseID stri
 
 	return nil
 }
+
+// MapEvidence takes an evidence artifact and maps it across all applicable compliance frameworks.
+// This ensures evidence is reused (e.g., one approval satisfies NIST, ISO, and SOC2).
+func (e *ControlEvaluationEngine) MapEvidence(ctx context.Context, auditCaseID, evidenceID string) error {
+	log.Info().Str("evidence_id", evidenceID).Msg("Mapping single evidence artifact across multiple frameworks")
+
+	// 1. Fetch the evidence classification/type
+	var evidenceType, classification string
+	err := e.db.QueryRow(ctx, `SELECT evidence_type, classification FROM evidence_artifacts WHERE id = $1`, evidenceID).Scan(&evidenceType, &classification)
+	if err != nil {
+		return fmt.Errorf("failed to fetch evidence artifact: %w", err)
+	}
+
+	// 2. Identify controls across ALL frameworks that require this evidence type
+	// If it matches, we mark the control evaluation as 'PASS' with 'AUTOMATIC_VERIFIED' confidence if it's high-integrity evidence
+	confidence := "MANUAL_REQUIRED"
+	if classification == "SECURITY_EVIDENCE" || classification == "AUTHENTICATION_DATA" {
+		confidence = "AUTOMATIC_VERIFIED"
+	}
+
+	_, err = e.db.Exec(ctx, `
+		UPDATE control_evaluations
+		SET status = CASE WHEN $3 = 'AUTOMATIC_VERIFIED' THEN 'PASS' ELSE 'NEEDS_REVIEW' END,
+		    evidence_ids = array_append(evidence_ids, $1),
+		    confidence = 1.0,
+		    explanation = 'Satisfied by automated evidence mapping: ' || $4,
+		    reviewer_status = $3,
+		    last_evaluated_at = NOW()
+		WHERE audit_case_id = $2
+		  AND control_id IN (
+			  SELECT c.control_code
+			  FROM framework_controls c
+			  WHERE $4 = ANY(c.required_evidence_types)
+		  )
+	`, evidenceID, auditCaseID, confidence, evidenceType)
+	
+	if err != nil {
+		return fmt.Errorf("failed to map evidence to controls: %w", err)
+	}
+
+	return nil
+}

@@ -1,9 +1,14 @@
 # Stage 1: Builder
+# Railway builds from the repo root, so paths are relative to repo root
 FROM golang:1.23-alpine AS builder
 WORKDIR /app
-COPY go.mod go.sum* ./
+
+# Copy only the worker module files first for caching
+COPY services/assessment-worker/go.mod services/assessment-worker/go.sum* ./
 RUN go mod download
-COPY . .
+
+# Copy worker source
+COPY services/assessment-worker/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o /assessment-worker ./cmd/worker/
 
 # Stage 2: Runner

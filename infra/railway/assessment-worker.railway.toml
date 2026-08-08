@@ -1,9 +1,8 @@
 [build]
-builder = "docker"
+builder = "DOCKERFILE"
 dockerfilePath = "services/assessment-worker/Dockerfile"
 
 [deploy]
-startCommand = "/app/assessment-worker"
 healthcheckPath = "/health/ready"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"

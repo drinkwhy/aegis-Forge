@@ -1,9 +1,8 @@
 [build]
-builder = "docker"
+builder = "DOCKERFILE"
 dockerfilePath = "services/control-plane/Dockerfile"
 
 [deploy]
-startCommand = "/app/control-plane"
 healthcheckPath = "/health/ready"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"

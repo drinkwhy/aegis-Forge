@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { CheckCircle2, Circle, Loader2, ArrowRight } from 'lucide-react';
 
 const STAGES = [
@@ -19,7 +19,8 @@ const STAGES = [
   { id: 'continuous_monitoring', label: 'Continuous Monitoring Begins' },
 ];
 
-export default function AuditTimeline({ params }: { params: { id: string } }) {
+export default function AuditTimeline({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [currentStage, setCurrentStage] = useState(1); // Mocking 'Install AegisAgent'
   const [progress, setProgress] = useState(45);
 
@@ -37,7 +38,7 @@ export default function AuditTimeline({ params }: { params: { id: string } }) {
         Aegis Security Assessment
       </h1>
       <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
-        Case ID: {params.id}
+        Audit Case: {id}
       </p>
 
       <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius)', padding: '32px', border: '1px solid var(--border)' }}>

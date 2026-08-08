@@ -1,7 +1,9 @@
 'use client';
+import { use } from 'react';
 import { Activity, ShieldAlert, CheckCircle2, Shield, AlertTriangle } from 'lucide-react';
 
-export default function RuntimeDashboard({ params }: { params: { id: string } }) {
+export default function RuntimeDashboard({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   return (
     <div style={{ padding: '24px', maxWidth: '1000px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
@@ -10,7 +12,7 @@ export default function RuntimeDashboard({ params }: { params: { id: string } })
             Runtime Security
           </h1>
           <p style={{ color: 'var(--text-secondary)' }}>
-            Asset ID: {params.id}
+            Asset ID: {id}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', background: 'var(--success-dim)', color: 'var(--success)', borderRadius: 'var(--radius)', fontWeight: 600 }}>

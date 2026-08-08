@@ -5,41 +5,27 @@ RUN npm install -g pnpm@9.15.4
 
 WORKDIR /app
 
-# ── Stage 2: Dependencies ─────────────────────────────────────
-FROM base AS deps
-
-# Copy workspace-level files needed for pnpm install
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
-
-# Copy package.json for each workspace member
-COPY apps/web/package.json apps/web/package.json
-COPY packages/db/package.json packages/db/package.json
-
-RUN pnpm install --no-frozen-lockfile
-
-# ── Stage 3: Builder ──────────────────────────────────────────
+# ── Stage 2: Builder ──────────────────────────────────────────
 FROM base AS builder
 
 WORKDIR /app
 
-# Copy all installed deps from the deps stage (root + workspace node_modules)
-COPY --from=deps /app ./
+# Copy entire repo into builder (node_modules excluded by .dockerignore)
+COPY . .
 
-# Copy source code (node_modules excluded by .dockerignore)
-COPY apps/web/ apps/web/
-COPY packages/db/ packages/db/
+# Install all workspace dependencies
+RUN pnpm install --no-frozen-lockfile
 
 # Build-time env vars
-ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_Zmx1ZW50LXN3YW4tOTYuY2xlcmsuYWNjb3VudHMuZGV2JA
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
+# Build web app
 RUN pnpm --filter @aegis/web build
 
-# ── Stage 4: Runner ───────────────────────────────────────────
+# ── Stage 3: Runner ───────────────────────────────────────────
 FROM base AS runner
 
-# standalone output preserves the monorepo directory structure,
-# so server.js lives at apps/web/server.js inside the standalone dir
 WORKDIR /app
 
 ENV NODE_ENV=production
